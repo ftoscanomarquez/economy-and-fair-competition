@@ -637,6 +637,12 @@ Ambos corregidos y verificados localmente (`npm ci`, `tsc`, `lint`, Vitest limpi
 
 **Séptimo run real — causa raíz de Node.js confirmada, `build-and-unit-tests` y `semgrep` en verde por primera vez.** Solo quedó fallando `Playwright E2E`, en el paso "Sembrar base de datos": `node: .env: not found`. Los scripts `scripts/seed-*.ts` usan `tsx --env-file=.env` (mismo patrón que en desarrollo local, no leen `process.env` directamente) — en CI no existe un archivo `.env` físico (correcto, nunca se versiona), aunque las variables ya estén inyectadas por el `env:` del job. Corregido agregando un paso "Generar .env para los scripts de seed" que escribe un `.env` temporal a partir de esas mismas variables antes de correr `npm run seed:all`, exclusivo del job de Playwright (el job `build-and-unit-tests` no lo necesita porque no llama a ningún script `seed:*`).
 
+**`ci.yml` verificado en verde de punta a punta** (3 jobs, run real en GitHub): `Build, lint, typecheck y Vitest` ✓, `Semgrep (SAST)` ✓, `Playwright E2E` ✓ (con Mongo+Mailpit efímeros, seed de contenido real, 16 tests). El pipeline automático de CI queda cerrado.
+
+## 2026-08-07 — Primera corrida real de `load-test.yml` (k6), mismos dos bugs ya corregidos en `ci.yml` pero replicados sin querer
+
+El usuario pidió correr el workflow manual de k6 para confirmarlo end-to-end. Se disparó vía `gh workflow run load-test.yml -f scenario=spike`. Falló con `sh: 1: tsx: not found` en el paso de seed — exactamente el mismo bug de `NODE_ENV: production` a nivel de job completo (`npm ci` omite `devDependencies`, incluyendo `tsx`) que ya se había diagnosticado y corregido en `ci.yml`, pero que no se replicó a `load-test.yml` en su momento porque ambos workflows se escribieron en paralelo antes de encontrar el bug. Corregido con el mismo patrón ya validado: `NODE_ENV: production` movido del nivel de job al paso `Build` únicamente, y agregado el mismo paso "Generar .env para los scripts de seed" antes de `npm run seed:all` (`tsx --env-file=.env`, no lee `process.env` directamente).
+
 ## Cómo retomar si se interrumpe el trabajo
 
 1. Leer esta sección "Estado actual" para saber la fase activa.
