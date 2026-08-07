@@ -8,8 +8,8 @@
 
 ## Estado actual
 
-**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. Trabajo actual: preparar el repo para subirlo a GitHub (`ftoscanomarquez/economy-and-fair-competition`) y agregar CI/CD (build, lint, typecheck, Vitest, Playwright, Semgrep; k6 manual).
-**Última actualización:** 2026-08-06
+**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo ya está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta: `ci.yml` (build/lint/typecheck/Vitest/Semgrep/Playwright E2E) automático en push y PR a `main`; `load-test.yml` (k6) manual bajo demanda — ambos verificados en verde con corridas reales.
+**Última actualización:** 2026-08-07
 
 ---
 
@@ -646,6 +646,8 @@ El usuario pidió correr el workflow manual de k6 para confirmarlo end-to-end. S
 **Segundo intento de `load-test.yml`, avanzó mucho más — dos problemas nuevos y reales, no repetición de bugs anteriores:** con el fix de `.env`/`NODE_ENV` aplicado, el job llegó hasta ejecutar k6 de verdad (seed, build, servidor levantado, k6 instalado, 3291 requests HTTP procesadas con **0% de fallos reales**). Falló el job igual (exit 99) por dos causas:
 1. `handleSummary()` en `tests/load/public-load.js` escribe `tests/reports/k6/public-load.html`, pero ese directorio no existe en un checkout limpio (`tests/reports/` completo está en `.gitignore`, correcto) y `k6` no lo crea automáticamente — error `could not open ... no such file or directory` al final de la corrida. Corregido con `mkdir -p tests/reports/k6` antes de `k6 run` en `load-test.yml`.
 2. El único threshold real que se cruzó fue `http_req_duration: p(95)<12000` (el SLA de referencia, documentado en `INFRA.md`, medido contra el hardware dedicado del entorno de desarrollo) — bajo 500 VUs instantáneos en el runner compartido de GitHub Actions (2 vCPU, sin réplicas), el p95 real fue de ~31s. No es una regresión de la app: `http_req_failed` fue `rate: 0` (cero errores). Corregido haciendo el umbral de latencia configurable vía `LATENCY_THRESHOLD_MS` (nueva env var opcional en `tests/load/public-load.js`, default `12000` sin cambios para uso local); `load-test.yml` lo pasa como `25000` específicamente para el contexto de CI, dejando intacto el SLA real para cualquier corrida local contra hardware de referencia.
+
+**Tercer intento de `load-test.yml`: éxito completo.** `k6 (spike)` en verde en 2m12s, reporte HTML subido correctamente como artifact `k6-report`. Los dos workflows de GitHub Actions (`ci.yml` automático en push/PR, `load-test.yml` manual bajo demanda) quedan verificados en verde de punta a punta con corridas reales.
 
 ## Cómo retomar si se interrumpe el trabajo
 
