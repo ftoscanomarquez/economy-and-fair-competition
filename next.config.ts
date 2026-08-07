@@ -9,7 +9,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    remotePatterns: [],
+    // Vercel Blob (lib/uploads.ts) sirve las imágenes subidas en producción
+    // desde un subdominio de blob.vercel-storage.com — next/image bloquea
+    // por defecto cualquier origen no listado aquí.
+    remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com" }],
   },
 };
 

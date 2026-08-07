@@ -1,11 +1,20 @@
 /**
- * Guardado y gestión de archivos binarios subidos a disco local:
- *   - public/uploads/<seccion>/  → imágenes, agrupadas por sección de origen
- *     (ver IMAGE_FOLDERS) para que el contenido de arranque (seeds) pueda
- *     versionar por carpeta qué imagen pertenece a qué parte del sitio.
- *   - public/documents/          → documentos fuente (PDF/DOCX/PPTX) subidos
- *     para extracción con IA (lib/ai/extract.ts) — se conservan para que el
- *     Markdown generado pueda enlazar el documento original como descarga.
+ * Guardado y gestión de archivos binarios subidos:
+ *   - Producción en Vercel (BLOB_READ_WRITE_TOKEN presente): sube a Vercel
+ *     Blob (público) — necesario porque el filesystem de Vercel es de solo
+ *     lectura salvo /tmp y no persiste entre deploys; un archivo guardado en
+ *     public/uploads/ ahí desaparecería en el siguiente deploy o ni siquiera
+ *     se podría escribir en runtime. Descubierto al ver que las imágenes
+ *     sembradas no cargaban en el primer deploy real (ver HISTORY.md).
+ *   - Desarrollo local / despliegues propios con disco persistente (Docker,
+ *     VPS) sin ese token: sigue escribiendo a disco local, comportamiento
+ *     original, sin cambios —
+ *       public/uploads/<seccion>/  → imágenes, agrupadas por sección de
+ *         origen (ver IMAGE_FOLDERS) para que el contenido de arranque
+ *         (seeds) pueda versionar por carpeta qué imagen pertenece a qué
+ *         parte del sitio.
+ *       public/documents/          → documentos fuente (PDF/DOCX/PPTX)
+ *         subidos para extracción con IA (lib/ai/extract.ts).
  *
  * Todo archivo guardado por cualquiera de las dos rutas queda además
  * registrado en la colección Mongo `uploaded_files`, que alimenta la
@@ -19,8 +28,11 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import crypto from "node:crypto";
+import { put, del, head } from "@vercel/blob";
 import { getEnv } from "./env";
 import { getDb } from "./db";
+
+const useBlobStorage = !!process.env.BLOB_READ_WRITE_TOKEN;
 
 export type UploadKind = "image" | "document";
 
@@ -65,10 +77,20 @@ async function saveBuffer(
   createdBy: string | null
 ): Promise<string> {
   const filename = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const dir = path.resolve(process.cwd(), baseDir);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, filename), buffer);
-  const url = `${publicPrefix}/${filename}`;
+
+  let url: string;
+  if (useBlobStorage) {
+    // pathname sin la barra inicial (Blob no la usa) — mantiene la misma
+    // organización por carpetas que el disco local (uploads/<seccion>/...).
+    const pathname = `${publicPrefix.slice(1)}/${filename}`;
+    const blob = await put(pathname, buffer, { access: "public", addRandomSuffix: false });
+    url = blob.url;
+  } else {
+    const dir = path.resolve(process.cwd(), baseDir);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, filename), buffer);
+    url = `${publicPrefix}/${filename}`;
+  }
 
   const db = await getDb();
   await db.collection<UploadedFileDoc>("uploaded_files").insertOne({
@@ -152,6 +174,11 @@ export async function listUploadedFiles(): Promise<UploadedFileSummary[]> {
   );
 }
 
+/** Una URL de Blob es absoluta (https://...public.blob.vercel-storage.com/...); las de disco local son rutas relativas (/uploads/... o /documents/...). */
+function isBlobUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
 function resolveDiskPathForUrl(url: string): string {
   const env = getEnv();
   if (url.startsWith("/uploads/")) {
@@ -161,6 +188,14 @@ function resolveDiskPathForUrl(url: string): string {
 }
 
 async function fileExistsForUrl(url: string): Promise<boolean> {
+  if (isBlobUrl(url)) {
+    try {
+      await head(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     await fs.access(resolveDiskPathForUrl(url));
     return true;
@@ -172,15 +207,16 @@ async function fileExistsForUrl(url: string): Promise<boolean> {
 /**
  * Confirma si una URL de archivo (guardada como referencia en, por ejemplo,
  * un bloque de post o el pie de un Markdown extraído) sigue existiendo en
- * disco. Usado para mostrar el aviso "documento depurado" en vez de un
+ * disco/Blob. Usado para mostrar el aviso "documento depurado" en vez de un
  * enlace roto cuando el admin ya eliminó el archivo desde /admin/files.
  */
 export async function isFileMissing(url: string | null | undefined): Promise<boolean> {
-  if (!url || (!url.startsWith("/uploads/") && !url.startsWith("/documents/"))) return false;
+  if (!url) return false;
+  if (!isBlobUrl(url) && !url.startsWith("/uploads/") && !url.startsWith("/documents/")) return false;
   return !(await fileExistsForUrl(url));
 }
 
-/** Elimina un archivo por id: borra el registro en Mongo y, si existe, el archivo físico en disco. */
+/** Elimina un archivo por id: borra el registro en Mongo y, si existe, el archivo físico en disco o en Blob. */
 export async function deleteUploadedFile(id: string): Promise<boolean> {
   const db = await getDb();
   const { ObjectId } = await import("mongodb");
@@ -188,9 +224,13 @@ export async function deleteUploadedFile(id: string): Promise<boolean> {
   if (!doc) return false;
 
   try {
-    await fs.unlink(resolveDiskPathForUrl(doc.url));
+    if (isBlobUrl(doc.url)) {
+      await del(doc.url);
+    } else {
+      await fs.unlink(resolveDiskPathForUrl(doc.url));
+    }
   } catch {
-    // El archivo físico ya no existía (borrado manual, o ya purgado antes) — igual se limpia el registro.
+    // El archivo ya no existía (borrado manual, o ya purgado antes) — igual se limpia el registro.
   }
 
   await db.collection("uploaded_files").deleteOne({ _id: new ObjectId(id) });
