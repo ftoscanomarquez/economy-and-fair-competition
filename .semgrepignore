@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.git/
+.codex/
+.claude/
+.impeccable/
+test-results/
+tests/reports/
+public/uploads/
+logs/
+*.tsbuildinfo
+package-lock.json

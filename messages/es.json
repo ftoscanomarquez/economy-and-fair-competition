@@ -1,0 +1,113 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "about": "Quiénes Somos",
+    "services": "Servicios",
+    "articles": "Artículos y Notas",
+    "contact": "Contacto",
+    "skipToContent": "Saltar al contenido principal",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú"
+  },
+  "footer": {
+    "rights": "Todos los derechos reservados.",
+    "admin": "Acceso administrativo"
+  },
+  "common": {
+    "learnMore": "Conocer más",
+    "close": "Cerrar",
+    "loading": "Cargando…"
+  },
+  "articles": {
+    "title": "Artículos y Notas",
+    "subtitle": "Manténgase informado con nuestros análisis y perspectivas sobre comercio internacional.",
+    "eyebrow": "ART. 601 — ARTÍCULOS Y NOTAS",
+    "readFull": "Leer artículo completo",
+    "downloadPdf": "Descargar PDF oficial",
+    "empty": "Aún no hay publicaciones disponibles. Vuelva pronto para conocer nuestros análisis más recientes.",
+    "filters": {
+      "search": "Buscar por título",
+      "searchInContent": "Buscar también en el contenido",
+      "type": "Tipo",
+      "category": "Categoría",
+      "tagsPlaceholder": "T-MEC, antidumping",
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "apply": "Aplicar filtros",
+      "clear": "Limpiar",
+      "dateError": "La fecha \"Hasta\" no puede ser anterior a la fecha \"Desde\".",
+      "showFilters": "Mostrar filtros",
+      "hideFilters": "Ocultar filtros",
+      "activeCount": "{count} activo(s)"
+    }
+  },
+  "admin": {
+    "toolbar": {
+      "modeLabel": "Modo admin",
+      "editContent": "Editar contenido",
+      "exitEdit": "Salir de edición",
+      "editionDisabled": "Edición desactivada",
+      "editionEnabled": "Edición activada",
+      "editingIn": "Editando contenido en {language}.",
+      "spanish": "Español",
+      "english": "English",
+      "aiAssistant": "Asistente IA",
+      "aiAssistantLabel": "Asistente de Redacción IA (próximamente)",
+      "aiAssistantTitle": "Asistente de Redacción IA",
+      "aiAssistantBody": "Disponible próximamente: reescribir, traducir y perfeccionar texto con Claude.",
+      "management": "Gestión",
+      "logout": "Cerrar sesión"
+    },
+    "drawer": {
+      "title": "Gestión de contenido",
+      "description": "Publicaciones y textos globales de la web.",
+      "searchPlaceholder": "Buscar publicaciones…",
+      "loading": "Cargando…",
+      "noResults": "Sin resultados.",
+      "published": "Publicado",
+      "draft": "Borrador",
+      "deleteLabel": "Eliminar {title}",
+      "deleteConfirm": "¿Eliminar \"{title}\"? Esta acción no se puede deshacer.",
+      "deleteSuccess": "Publicación eliminada",
+      "deleteError": "No se pudo eliminar",
+      "loadError": "No se pudieron cargar las publicaciones",
+      "connectionError": "Error de conexión"
+    },
+    "login": {
+      "title": "Acceso administrativo",
+      "subtitle": "Economy and Fair Competition",
+      "emailLabel": "Correo electrónico",
+      "sendCode": "Enviar código de acceso",
+      "sending": "Enviando…",
+      "codeLabel": "Código de 6 dígitos",
+      "verify": "Verificar e ingresar",
+      "verifying": "Verificando…",
+      "useAnotherEmail": "Usar otro correo",
+      "codeSent": "Código enviado",
+      "codeSentDescription": "Revisa tu correo. En desarrollo, consulta {mailpitUrl}.",
+      "codeSentDescriptionNoMailpit": "Revisa tu bandeja de entrada.",
+      "codeSendError": "No se pudo enviar el código",
+      "codeInvalid": "Código incorrecto",
+      "sessionStarted": "Sesión iniciada",
+      "connectionError": "Error de conexión"
+    },
+    "dashboard": {
+      "title": "Panel administrativo",
+      "eyebrow": "Panel administrativo",
+      "welcome": "Bienvenido, {email}",
+      "instructions": "Ve a la landing pública y activa \"Editar contenido\" en la barra superior para editar textos directamente en la página, en español o inglés. Usa \"Gestión\" para administrar publicaciones.",
+      "liveEditTitle": "Edición en vivo",
+      "liveEditDescription": "Activa el modo de edición desde la barra superior en cualquier página pública.",
+      "goToLanding": "Ir a la landing"
+    },
+    "nav": {
+      "dashboard": "Panel",
+      "posts": "Publicaciones",
+      "templates": "Plantillas",
+      "content": "Secciones",
+      "files": "Archivos",
+      "backToSite": "Ver sitio público",
+      "logout": "Cerrar sesión"
+    }
+  }
+}

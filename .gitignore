@@ -1,0 +1,61 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+/tests/reports
+/test-results
+/playwright-report
+/playwright/.cache
+/tests/e2e/.auth
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files
+.env
+.env*.local
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# logs
+/logs/*.log
+
+# uploads (contenido subido en runtime, no versionado — el estado de
+# arranque real vive en content/seed-images/ y se copia aquí vía
+# `npm run seed:images`, ver scripts/seed-images.ts)
+/public/uploads/*
+!/public/uploads/*/
+/public/uploads/*/*
+!/public/uploads/*/.gitkeep
+/public/documents/*
+!/public/documents/.gitkeep
+
+# configuración local de asistentes de IA (rutas absolutas de esta máquina, no portable)
+/.claude/
+/.codex/
+/.impeccable/
+
+# secrets
+CREDENTIALS.local.md

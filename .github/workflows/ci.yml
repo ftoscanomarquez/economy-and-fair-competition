@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20.9.0"
+
+jobs:
+  # Build + lint + typecheck + Vitest: no dependen de Mongo/Mailpit reales,
+  # corren siempre y son el gate más rápido antes de invertir tiempo en E2E.
+  build-and-unit-tests:
+    name: Build, lint, typecheck y Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Vitest
+        run: npm run test
+
+      - name: Build (Next.js)
+        run: npm run build
+        env:
+          # Variables mínimas requeridas por lib/env.ts (ver Zod schema) para
+          # que `next build` pueda evaluar rutas server-side en build time.
+          # Valores de prueba, sin relación con las credenciales reales de
+          # producción (esas viven solo en Vercel).
+          NODE_ENV: production
+          NEXT_PUBLIC_SITE_URL: http://localhost:3100
+          MONGODB_URI: mongodb://localhost:27017
+          MONGODB_DB: economy-and-fair-competition-ci
+          CONTACT_NOTIFICATION_EMAIL: contacto@economyandfaircompetition.com
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+          ADMIN_ALLOWED_EMAILS: admin@economyandfaircompetition.com
+
+      - name: Subir reporte de Vitest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-report
+          path: tests/reports/vitest
+          retention-days: 14
+
+  # E2E (Playwright): necesita una base de datos y un servidor de correo
+  # reales para ejercitar el flujo completo (login por magic link, crear
+  # posts/plantillas, editar contenido en vivo). Mongo y Mailpit corren como
+  # contenedores efímeros del propio job — se destruyen al terminar, nunca
+  # tocan el Atlas ni el Mailpit reales del entorno de desarrollo.
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    needs: build-and-unit-tests
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      mailpit:
+        image: axllent/mailpit:latest
+        env:
+          MP_UI_AUTH: admin:magiclink123
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      NODE_ENV: development
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DB: economy-and-fair-competition-ci
+      MAILPIT_HOST: localhost
+      MAILPIT_PORT: 1025
+      MAILPIT_UI_URL: http://localhost:8025
+      CONTACT_NOTIFICATION_EMAIL: contacto@economyandfaircompetition.com
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      ADMIN_ALLOWED_EMAILS: admin@economyandfaircompetition.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar navegadores de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Sembrar base de datos (schema + imágenes + contenido real + posts)
+        run: npm run seed:all
+
+      - name: Playwright E2E
+        run: npm run test:e2e
+
+      - name: Subir reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/reports/playwright
+          retention-days: 14
+
+  # Semgrep: SAST, no depende de servicios externos — corre en paralelo a
+  # build-and-unit-tests. No falla el pipeline por hallazgos (Semgrep en modo
+  # "auto" puede producir falsos positivos); el reporte queda disponible como
+  # artefacto para revisión humana, igual que en el flujo local documentado
+  # en QUICK-START.md.
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Semgrep scan
+        run: semgrep scan --config auto --json --output tests/reports/semgrep/report.json .
+        continue-on-error: true
+
+      - name: Configurar Node (para el generador de reporte HTML)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.9.0"
+
+      - name: Generar reporte HTML
+        run: node scripts/semgrep-html-report.mjs
+
+      - name: Subir reporte de Semgrep
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: tests/reports/semgrep
+          retention-days: 14

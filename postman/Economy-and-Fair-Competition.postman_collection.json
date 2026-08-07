@@ -1,0 +1,858 @@
+{
+  "info": {
+    "_postman_id": "1f4d6c2e-9a3b-4e7f-8c1a-6b2d4e5f7a90",
+    "name": "Economy and Fair Competition - API",
+    "description": "Colección completa de la API del sitio institucional Economy and Fair Competition. Cubre autenticación admin (magic link vía Mailpit), edición de textos institucionales, contacto, plantillas de bloques, publicaciones (Artículos/Notas), IA (conversión a Markdown), subida de imágenes y el servidor MCP para WhatsApp.\n\nIMPORTANTE — el flujo de login requiere DOS corridas separadas porque el código de 6 dígitos vive en un correo real (Mailpit) que Postman no puede leer de forma confiable de manera 100% automática dentro de un solo Runner:\n\n  1ª corrida: ejecutar SOLO '01 - Auth (magic link) > 1. Solicitar código'. Esto envía un correo nuevo a Mailpit (http://localhost:8025, admin/magiclink123).\n  Entre corridas: abrir Mailpit, copiar el código de 6 dígitos del correo más reciente, pegarlo en la variable de entorno 'magicLinkCode'.\n  2ª corrida: ejecutar el resto de la colección desde '01 - Auth > 3. Verificar código' en adelante (o toda la colección completa, evitando volver a correr el paso 1, que invalidaría el código recién copiado al generar uno nuevo).\n\nUna vez logueado, la cookie de sesión queda en el Cookie Jar de Postman para el resto de carpetas de la colección en esa misma corrida.\n\nVer QUICK-START.md del proyecto para instrucciones de entorno (Mailpit, MongoDB, variables .env) y el detalle paso a paso de este flujo.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Aserción global mínima aplicada a toda request que no defina las suyas propias:",
+          "// el body siempre debe ser JSON parseable (salvo respuestas vacías/binarias).",
+          "if (pm.response.code !== 204 && pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+          "  pm.test('El body es JSON válido', function () {",
+          "    pm.response.json();",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth (magic link)",
+      "item": [
+        {
+          "name": "1. Solicitar código (request-code)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('sent es true', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.sent).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/request-code", "host": ["{{baseUrl}}"], "path": ["api", "auth", "request-code"] },
+            "description": "Envía un código de 6 dígitos al correo del admin vía Mailpit (dev). Rate limit: 5/min por IP."
+          }
+        },
+        {
+          "name": "2. Leer código en Mailpit (manual)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('magicLinkCode fue configurado en el environment', function () {",
+                  "  pm.expect(pm.environment.get('magicLinkCode')).to.match(/^\\d{6}$/,",
+                  "    'Abre http://localhost:8025, copia el código de 6 dígitos del correo más reciente y pégalo en la variable magicLinkCode del environment antes de continuar.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/session", "host": ["{{baseUrl}}"], "path": ["api", "auth", "session"] },
+            "description": "PASO MANUAL: abre http://localhost:8025 (Mailpit, credenciales admin/magiclink123), abre el correo más reciente \"Tu código de acceso\" y copia el código de 6 dígitos en la variable de entorno {{magicLinkCode}} antes de ejecutar el siguiente request.\n\nSe intentó automatizar esta lectura con un script de Postman que consulta la API de Mailpit, pero el sandbox de prerequest de Newman no espera de forma confiable callbacks async anidados (pm.sendRequest dentro de pm.sendRequest) — el step continuaba antes de que la respuesta llegara. Se optó por este paso manual, más simple y 100% confiable, en vez de una automatización frágil.\n\nEste request en sí (GET /api/auth/session) es solo un portador inocuo para el test que valida que llenaste la variable; no hace falta para el flujo en sí."
+          }
+        },
+        {
+          "name": "3. Verificar código (crea sesión)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Devuelve el email autenticado', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.email).to.eql(pm.environment.get('adminEmail'));",
+                  "});",
+                  "pm.test('Set-Cookie de sesión presente', function () {",
+                  "  pm.response.to.have.header('Set-Cookie');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"code\": \"{{magicLinkCode}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/verify-code", "host": ["{{baseUrl}}"], "path": ["api", "auth", "verify-code"] },
+            "description": "Verifica el código y otorga la cookie de sesión httpOnly. Postman guarda la cookie automáticamente en su Cookie Jar para las siguientes requests de la colección (mismo dominio/baseUrl)."
+          }
+        },
+        {
+          "name": "4. Ver sesión actual",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('authenticated es true', function () {",
+                  "  pm.expect(pm.response.json().authenticated).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/session", "host": ["{{baseUrl}}"], "path": ["api", "auth", "session"] }
+          }
+        },
+        {
+          "name": "5. Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('loggedOut es true', function () {",
+                  "  pm.expect(pm.response.json().loggedOut).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] },
+            "description": "Deshabilitado del flujo principal del Runner por defecto (mover al final si se quiere probar el cierre de sesión); si se ejecuta, las siguientes requests admin de la colección volverán a fallar con 401 hasta repetir el login."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Textos institucionales (site-texts)",
+      "item": [
+        {
+          "name": "Obtener textos (ES)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Incluye home.hero.eyebrow', function () {",
+                  "  pm.expect(pm.response.json().texts).to.have.property('home.hero.eyebrow');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/content/site-texts?locale=es", "host": ["{{baseUrl}}"], "path": ["api", "content", "site-texts"], "query": [{ "key": "locale", "value": "es" }] }
+          }
+        },
+        {
+          "name": "Actualizar texto (requiere sesión)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('updated es true', function () {",
+                  "  pm.expect(pm.response.json().updated).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"home.hero.eyebrow\",\n  \"es\": \"COMERCIO EXTERIOR · ADUANAS · PROPIEDAD INTELECTUAL\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/content/site-texts", "host": ["{{baseUrl}}"], "path": ["api", "content", "site-texts"] },
+            "description": "Requiere sesión admin activa (ejecutar primero 01 - Auth). El valor de ejemplo reescribe con el mismo texto institucional original para no dejar datos de prueba."
+          }
+        },
+        {
+          "name": "Actualizar texto sin sesión (debe fallar 401)",
+          "protocolProfileBehavior": { "disableCookies": true },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401 sin sesión', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"home.hero.eyebrow\",\n  \"es\": \"no debería guardarse\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/content/site-texts", "host": ["{{baseUrl}}"], "path": ["api", "content", "site-texts"] },
+            "description": "Prueba negativa de seguridad: 'protocolProfileBehavior.disableCookies' evita que Postman adjunte la cookie de sesión del Cookie Jar a ESTA request, simulando un cliente sin sesión, sin afectar al resto de la colección."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Contacto",
+      "item": [
+        {
+          "name": "Enviar formulario de contacto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('received es true', function () {",
+                  "  pm.expect(pm.response.json().received).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cliente de prueba Postman\",\n  \"company\": \"Importadora de prueba S.A.\",\n  \"email\": \"cliente-prueba@example.com\",\n  \"phone\": \"+52 55 1234 5678\",\n  \"areaOfInterest\": \"Comercio Exterior\",\n  \"message\": \"Solicito una consulta sobre clasificación arancelaria para una operación de importación.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/contact", "host": ["{{baseUrl}}"], "path": ["api", "contact"] },
+            "description": "Rate limit: 5/min por IP. Envía notificación por correo (Mailpit en dev) a CONTACT_NOTIFICATION_EMAIL."
+          }
+        },
+        {
+          "name": "Enviar formulario inválido (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"correo-invalido\",\n  \"message\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/contact", "host": ["{{baseUrl}}"], "path": ["api", "contact"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Plantillas (templates)",
+      "item": [
+        {
+          "name": "Listar plantillas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('templates es un arreglo', function () {",
+                  "  pm.expect(pm.response.json().templates).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/templates", "host": ["{{baseUrl}}"], "path": ["api", "templates"] }
+          }
+        },
+        {
+          "name": "Crear plantilla (requiere sesión)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Devuelve id y lo guarda en {{templateId}}', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.be.a('string');",
+                  "  pm.environment.set('templateId', body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plantilla de prueba Postman\",\n  \"blocks\": [\n    { \"id\": \"block-hero\", \"type\": \"hero\" },\n    { \"id\": \"block-richtext\", \"type\": \"richtext\" },\n    { \"id\": \"block-chart\", \"type\": \"chart\" }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/templates", "host": ["{{baseUrl}}"], "path": ["api", "templates"] },
+            "description": "Guarda el id devuelto en {{templateId}} para usarlo en las siguientes requests de esta carpeta y en '05 - Publicaciones'."
+          }
+        },
+        {
+          "name": "Obtener plantilla por id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('El nombre coincide', function () {",
+                  "  pm.expect(pm.response.json().template.name).to.eql('Plantilla de prueba Postman');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/templates/{{templateId}}", "host": ["{{baseUrl}}"], "path": ["api", "templates", "{{templateId}}"] }
+          }
+        },
+        {
+          "name": "Actualizar plantilla",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('updated es true', function () {",
+                  "  pm.expect(pm.response.json().updated).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plantilla de prueba Postman (editada)\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/templates/{{templateId}}", "host": ["{{baseUrl}}"], "path": ["api", "templates", "{{templateId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Publicaciones (posts)",
+      "item": [
+        {
+          "name": "Listar publicaciones (públicas)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('posts es un arreglo', function () {",
+                  "  pm.expect(pm.response.json().posts).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/posts?locale=es", "host": ["{{baseUrl}}"], "path": ["api", "posts"], "query": [{ "key": "locale", "value": "es" }] }
+          }
+        },
+        {
+          "name": "Listar incluyendo borradores sin sesión (debe fallar 401)",
+          "protocolProfileBehavior": { "disableCookies": true },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401 sin sesión', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/posts?includeDrafts=true", "host": ["{{baseUrl}}"], "path": ["api", "posts"], "query": [{ "key": "includeDrafts", "value": "true" }] }
+          }
+        },
+        {
+          "name": "Crear publicación (requiere sesión + templateId)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('postSlug', 'prueba-postman-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Devuelve id y lo guarda en {{postId}}', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.be.a('string');",
+                  "  pm.environment.set('postId', body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{postSlug}}\",\n  \"templateId\": \"{{templateId}}\",\n  \"postType\": \"articulo\",\n  \"category\": \"comercio-exterior\",\n  \"tags\": [\"prueba\", \"postman\"],\n  \"titleEs\": \"Publicación de prueba (Postman)\",\n  \"titleEn\": \"Test post (Postman)\",\n  \"summaryEs\": \"Resumen de prueba generado por la colección Postman.\",\n  \"summaryEn\": \"Test summary generated by the Postman collection.\",\n  \"blocksEs\": [\n    { \"id\": \"block-hero\", \"type\": \"hero\", \"title\": \"Título de impacto de prueba\", \"imageUrl\": null },\n    { \"id\": \"block-richtext\", \"type\": \"richtext\", \"markdown\": \"## Sección de prueba\\n\\nContenido **generado** desde Postman.\" },\n    { \"id\": \"block-chart\", \"type\": \"chart\", \"title\": \"Gráfica de prueba\", \"chartType\": \"bar\", \"data\": [{ \"label\": \"2024\", \"value\": 100 }, { \"label\": \"2025\", \"value\": 150 }] }\n  ],\n  \"blocksEn\": [\n    { \"id\": \"block-hero\", \"type\": \"hero\", \"title\": \"Test impact title\", \"imageUrl\": null },\n    { \"id\": \"block-richtext\", \"type\": \"richtext\", \"markdown\": \"## Test section\\n\\nContent **generated** from Postman.\" },\n    { \"id\": \"block-chart\", \"type\": \"chart\", \"title\": \"Test chart\", \"chartType\": \"bar\", \"data\": [{ \"label\": \"2024\", \"value\": 100 }, { \"label\": \"2025\", \"value\": 150 }] }\n  ],\n  \"status\": \"draft\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] },
+            "description": "Requiere {{templateId}} ya seteado (ejecutar '04 - Plantillas > Crear plantilla' primero). Guarda el id en {{postId}} y el slug generado en {{postSlug}}."
+          }
+        },
+        {
+          "name": "Obtener publicación por id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('El slug coincide', function () {",
+                  "  pm.expect(pm.response.json().post.slug).to.eql(pm.environment.get('postSlug'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/posts/{{postId}}?locale=es", "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{postId}}"], "query": [{ "key": "locale", "value": "es" }] }
+          }
+        },
+        {
+          "name": "Publicar (status -> published)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('updated es true', function () {",
+                  "  pm.expect(pm.response.json().updated).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"published\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/posts/{{postId}}", "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{postId}}"] }
+          }
+        },
+        {
+          "name": "Crear publicación con slug duplicado (debe fallar 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{postSlug}}\",\n  \"postType\": \"nota\",\n  \"titleEs\": \"Duplicado\",\n  \"titleEn\": \"Duplicate\",\n  \"blocksEs\": [],\n  \"blocksEn\": []\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
+          }
+        },
+        {
+          "name": "Eliminar publicación (limpieza)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('deleted es true', function () {",
+                  "  pm.expect(pm.response.json().deleted).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/posts/{{postId}}", "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{postId}}"] },
+            "description": "Ejecutar al final del Runner para no dejar datos de prueba en la base de datos. Tras esto, '04 - Plantillas > Eliminar plantilla en uso' ya puede borrar {{templateId}} sin el 409."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - IA (Markdown) y subida de imágenes",
+      "item": [
+        {
+          "name": "Convertir texto plano a Markdown (IA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 200 si hay ANTHROPIC_API_KEY configurada (admin o .env); 503 si no hay IA configurada.",
+                  "pm.test('Status 200 o 503 (según configuración de IA)', function () {",
+                  "  pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Titulo del articulo\\nLa politica arancelaria reciente afecta a los importadores.\\nPrimero deben revisar su clasificacion. Segundo deben validar su origen. Tercero deben calcular el impacto en costos.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/ai/markdown", "host": ["{{baseUrl}}"], "path": ["api", "ai", "markdown"] },
+            "description": "Requiere sesión admin. Rate limit: 20/min por IP. Requiere ANTHROPIC_API_KEY configurada (vía panel admin o .env) para devolver 200; si no, responde 503 de forma controlada (circuit breaker / fallback documentado)."
+          }
+        },
+        {
+          "name": "Subir imagen (multipart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Si no se seleccionó un archivo local en Postman (campo 'file' vacío por defecto",
+                  "// en un JSON de colección, que no puede portar binarios), el servidor responde 400",
+                  "// de forma correcta ('sin archivo'). Solo se valida 201 cuando sí hay archivo adjunto.",
+                  "if (pm.response.code === 400) {",
+                  "  pm.test('400 esperado sin archivo adjunto (seleccionar uno en la UI de Postman para probar 201)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "  pm.test('Devuelve url y la guarda en {{uploadedImageUrl}}', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.url).to.be.a('string');",
+                  "    pm.environment.set('uploadedImageUrl', body.url);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/api/uploads", "host": ["{{baseUrl}}"], "path": ["api", "uploads"] },
+            "description": "Requiere sesión admin. En el campo 'file' selecciona manualmente una imagen PNG/JPEG/WEBP/GIF desde el cliente de Postman (Postman no permite adjuntar binarios vía JSON de colección; el campo queda vacío hasta que se elige un archivo local en la UI)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Servidor MCP (WhatsApp)",
+      "item": [
+        {
+          "name": "list_templates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('result.templates es un arreglo', function () {",
+                  "  pm.expect(pm.response.json().result.templates).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"list_templates\",\n  \"params\": {}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] },
+            "description": "No requiere callerPhone (herramienta de lectura). El editor de plantillas NO se expone por MCP — solo permite elegir un templateId existente."
+          }
+        },
+        {
+          "name": "list_posts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('result.posts es un arreglo', function () {",
+                  "  pm.expect(pm.response.json().result.posts).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"list_posts\",\n  \"params\": { \"locale\": \"es\", \"status\": \"published\" }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] }
+          }
+        },
+        {
+          "name": "get_post_detail (por slug)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 o 404', function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"get_post_detail\",\n  \"params\": { \"slug\": \"{{postSlug}}\", \"locale\": \"es\" }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] }
+          }
+        },
+        {
+          "name": "create_post_from_media (markdown directo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El envelope MCP responde siempre 200 con { tool, result } (no diferencia",
+                  "// 201 como el REST de /api/posts) — 403 si callerPhone no está en la whitelist.",
+                  "pm.test('Status 200 o 403 (según whitelist de teléfono)', function () {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Se crea siempre como draft', function () {",
+                  "    pm.expect(pm.response.json().result.status).to.eql('draft');",
+                  "  });",
+                  "  pm.test('Guarda el id del post creado en {{postId}}', function () {",
+                  "    pm.environment.set('postId', pm.response.json().result.id);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"create_post_from_media\",\n  \"params\": {\n    \"templateId\": \"{{templateId}}\",\n    \"postType\": \"nota\",\n    \"category\": \"comercio-exterior\",\n    \"tags\": [\"whatsapp\", \"prueba\"],\n    \"titleEs\": \"Nota creada vía MCP (Postman)\",\n    \"titleEn\": \"Note created via MCP (Postman)\",\n    \"markdown\": \"## Contenido enviado por WhatsApp\\n\\nEste contenido simula un mensaje recibido y convertido a Markdown.\"\n  },\n  \"callerPhone\": \"{{mcpAdminPhone}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] },
+            "description": "Requiere {{mcpAdminPhone}} en la whitelist MCP_ADMIN_PHONES del .env, si no responde 403. Requiere exactamente uno de markdown/pdfBase64/externalUrl. Siempre crea como borrador — nunca publica directo desde WhatsApp."
+          }
+        },
+        {
+          "name": "update_post (requiere callerPhone autorizado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"update_post\",\n  \"params\": {\n    \"id\": \"{{postId}}\",\n    \"status\": \"published\"\n  },\n  \"callerPhone\": \"{{mcpAdminPhone}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] }
+          }
+        },
+        {
+          "name": "delete_post (requiere callerPhone autorizado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mcpSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"delete_post\",\n  \"params\": {\n    \"id\": \"{{postId}}\"\n  },\n  \"callerPhone\": \"{{mcpAdminPhone}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] },
+            "description": "Deshabilitada del flujo automático por defecto: solo ejecutar manualmente para limpiar el post creado por 'create_post_from_media' si no se usó ya la limpieza de la carpeta 05."
+          }
+        },
+        {
+          "name": "Sin Authorization (debe fallar 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tool\": \"list_templates\",\n  \"params\": {}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/mcp", "host": ["{{baseUrl}}"], "path": ["api", "mcp"] },
+            "description": "Prueba negativa de seguridad: sin header Authorization el secreto no valida y debe rechazar con 401."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Limpieza",
+      "item": [
+        {
+          "name": "Eliminar plantilla de prueba",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 200 si ya no hay posts usándola (caso normal: '05 - Publicaciones' ya",
+                  "// eliminó el post de prueba en su propia limpieza). 409 si se corre este",
+                  "// Runner con la limpieza de posts deshabilitada — ambos casos documentan",
+                  "// la regla de negocio real (no se puede borrar una plantilla en uso).",
+                  "pm.test('Status 200 o 409 (según si queda algún post usándola)', function () {",
+                  "  pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/templates/{{templateId}}", "host": ["{{baseUrl}}"], "path": ["api", "templates", "{{templateId}}"] },
+            "description": "Ejecutar al final del Runner: borra la plantilla de prueba creada en '04 - Plantillas'. Para observar el 409 real de la regla 'no se puede borrar una plantilla en uso', deshabilita momentáneamente la request 'Eliminar publicación (limpieza)' de la carpeta 05 antes de correr el Runner completo."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+name: Load test (k6)
+
+# Manual / bajo demanda — no corre en cada push/PR. k6 (pico + sostenida
+# 15 min) es pesado y no aporta valor en cada commit; se dispara a mano
+# desde la pestaña Actions cuando se quiere validar rendimiento (ej. antes
+# de un release, o tras un cambio que pueda afectar performance).
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Escenario k6 a correr"
+        required: true
+        default: spike
+        type: choice
+        options:
+          - spike
+          - sustained
+          - both
+
+jobs:
+  k6:
+    name: k6 (${{ inputs.scenario }})
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DB: economy-and-fair-competition-ci
+      CONTACT_NOTIFICATION_EMAIL: contacto@economyandfaircompetition.com
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      ADMIN_ALLOWED_EMAILS: admin@economyandfaircompetition.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.9.0"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Sembrar base de datos
+        run: npm run seed:all
+
+      - name: Build
+        run: npm run build
+
+      - name: Levantar servidor (background)
+        run: npx next start -p 3100 &
+
+      - name: Esperar a que el servidor responda
+        run: npx wait-on http://localhost:3100 --timeout 60000
+
+      - name: Instalar k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: k6 run
+        run: k6 run --env SCENARIO=${{ inputs.scenario }} tests/load/public-load.js
+
+      - name: Subir reporte de k6
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-report
+          path: tests/reports/k6
+          retention-days: 30

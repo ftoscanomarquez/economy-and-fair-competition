@@ -1,0 +1,113 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About Us",
+    "services": "Services",
+    "articles": "Articles & Notes",
+    "contact": "Contact",
+    "skipToContent": "Skip to main content",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "footer": {
+    "rights": "All rights reserved.",
+    "admin": "Admin access"
+  },
+  "common": {
+    "learnMore": "Learn more",
+    "close": "Close",
+    "loading": "Loading…"
+  },
+  "articles": {
+    "title": "Articles & Notes",
+    "subtitle": "Stay informed with our analysis and perspectives on international trade.",
+    "eyebrow": "ART. 601 — ARTICLES & NOTES",
+    "readFull": "Read full article",
+    "downloadPdf": "Download official PDF",
+    "empty": "No publications are available yet. Check back soon for our latest analysis.",
+    "filters": {
+      "search": "Search by title",
+      "searchInContent": "Also search in content",
+      "type": "Type",
+      "category": "Category",
+      "tagsPlaceholder": "USMCA, antidumping",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "apply": "Apply filters",
+      "clear": "Clear",
+      "dateError": "The \"To\" date cannot be earlier than the \"From\" date.",
+      "showFilters": "Show filters",
+      "hideFilters": "Hide filters",
+      "activeCount": "{count} active"
+    }
+  },
+  "admin": {
+    "toolbar": {
+      "modeLabel": "Admin mode",
+      "editContent": "Edit content",
+      "exitEdit": "Exit editing",
+      "editionDisabled": "Editing disabled",
+      "editionEnabled": "Editing enabled",
+      "editingIn": "Editing content in {language}.",
+      "spanish": "Español",
+      "english": "English",
+      "aiAssistant": "AI Assistant",
+      "aiAssistantLabel": "AI Writing Assistant (coming soon)",
+      "aiAssistantTitle": "AI Writing Assistant",
+      "aiAssistantBody": "Coming soon: rewrite, translate, and polish text with Claude.",
+      "management": "Manage",
+      "logout": "Log out"
+    },
+    "drawer": {
+      "title": "Content management",
+      "description": "Publications and global site text.",
+      "searchPlaceholder": "Search publications…",
+      "loading": "Loading…",
+      "noResults": "No results.",
+      "published": "Published",
+      "draft": "Draft",
+      "deleteLabel": "Delete {title}",
+      "deleteConfirm": "Delete \"{title}\"? This action cannot be undone.",
+      "deleteSuccess": "Publication deleted",
+      "deleteError": "Could not delete",
+      "loadError": "Could not load publications",
+      "connectionError": "Connection error"
+    },
+    "login": {
+      "title": "Admin access",
+      "subtitle": "Economy and Fair Competition",
+      "emailLabel": "Email address",
+      "sendCode": "Send access code",
+      "sending": "Sending…",
+      "codeLabel": "6-digit code",
+      "verify": "Verify and sign in",
+      "verifying": "Verifying…",
+      "useAnotherEmail": "Use another email",
+      "codeSent": "Code sent",
+      "codeSentDescription": "Check your email. In development, see {mailpitUrl}.",
+      "codeSentDescriptionNoMailpit": "Check your inbox.",
+      "codeSendError": "Could not send code",
+      "codeInvalid": "Incorrect code",
+      "sessionStarted": "Session started",
+      "connectionError": "Connection error"
+    },
+    "dashboard": {
+      "title": "Admin panel",
+      "eyebrow": "Admin panel",
+      "welcome": "Welcome, {email}",
+      "instructions": "Go to the public landing page and turn on \"Edit content\" in the top bar to edit text directly on the page, in Spanish or English. Use \"Manage\" to administer publications.",
+      "liveEditTitle": "Live editing",
+      "liveEditDescription": "Turn on editing mode from the top bar on any public page.",
+      "goToLanding": "Go to the landing page"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "posts": "Posts",
+      "templates": "Templates",
+      "content": "Sections",
+      "files": "Files",
+      "backToSite": "View public site",
+      "logout": "Log out"
+    }
+  }
+}
