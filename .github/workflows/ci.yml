@@ -7,7 +7,12 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: "20.9.0"
+  # "20" (no un patch exacto) resuelve siempre al último release de la línea
+  # 20.x LTS disponible en el runner — evita bugs conocidos de patches viejos
+  # (ej. 20.9.0 falla al cargar el binario de tsc con
+  # ERR_UNKNOWN_FILE_EXTENSION en proyectos ESM). Sigue cumpliendo el mínimo
+  # ">=20.9.0" declarado en package.json.
+  NODE_VERSION: "20"
 
 jobs:
   # Build + lint + typecheck + Vitest: no dependen de Mongo/Mailpit reales,

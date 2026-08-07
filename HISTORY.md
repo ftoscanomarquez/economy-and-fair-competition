@@ -627,6 +627,8 @@ Ambos corregidos y verificados localmente (`npm ci`, `tsc`, `lint`, Vitest limpi
 
 **Segundo run real, tercer fallo corregido:** `npm ci`/lint/typecheck ya pasaban, pero `Vitest` fallaba con `Variables de entorno inválidas` (`NEXT_PUBLIC_SITE_URL`, `MONGODB_URI`, etc. requeridas) — `tests/unit/setup.ts` lee `.env` del disco solo como fallback (nunca sobreescribe variables ya presentes en `process.env`), pero yo había puesto esas variables de prueba solo en el paso `Build (Next.js)` del `ci.yml`, no a nivel de todo el job — el paso `Vitest` corre antes y no las veía. Corregido moviendo el bloque `env:` al nivel del job `build-and-unit-tests` completo, para que tanto `Vitest` como `Build` las hereden.
 
+**Tercer run real, cuarto fallo corregido:** con las env vars ya resueltas, `Typecheck` falló con `TypeError [ERR_UNKNOWN_FILE_EXTENSION]` al cargar el binario `tsc` — un bug conocido de Node 20.9.0 exacto (el patch mínimo que fijaba `ci.yml`/`load-test.yml`) al cargar un binario sin extensión de archivo desde un paquete `"type":"module"`. Corregido cambiando `node-version` de `"20.9.0"` a `"20"` en ambos workflows, que resuelve siempre al último release de la línea 20.x LTS disponible en el runner (sigue cumpliendo el mínimo `>=20.9.0` de `package.json`, pero evita este bug de un patch viejo específico).
+
 ## Cómo retomar si se interrumpe el trabajo
 
 1. Leer esta sección "Estado actual" para saber la fase activa.
