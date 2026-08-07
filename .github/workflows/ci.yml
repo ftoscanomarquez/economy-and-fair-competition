@@ -7,12 +7,12 @@ on:
     branches: [main]
 
 env:
-  # "20" (no un patch exacto) resuelve siempre al último release de la línea
-  # 20.x LTS disponible en el runner — evita bugs conocidos de patches viejos
-  # (ej. 20.9.0 falla al cargar el binario de tsc con
-  # ERR_UNKNOWN_FILE_EXTENSION en proyectos ESM). Sigue cumpliendo el mínimo
-  # ">=20.9.0" declarado en package.json.
-  NODE_VERSION: "20"
+  # file-type@22 y pdfjs-dist@6 (dependencias reales del proyecto, usadas
+  # por lib/ai/extract.ts) requieren Node >=22 — Node 20 las instala igual
+  # bajo legacy-peer-deps pero rompe silenciosamente la resolución de tipos
+  # de TypeScript aguas abajo. "22" (no un patch exacto) resuelve siempre al
+  # último release de la línea 22.x LTS disponible en el runner.
+  NODE_VERSION: "22"
 
 jobs:
   # Build + lint + typecheck + Vitest: no dependen de Mongo/Mailpit reales,
