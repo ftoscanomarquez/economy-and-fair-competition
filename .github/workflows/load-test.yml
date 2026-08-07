@@ -86,7 +86,9 @@ jobs:
           sudo apt-get install k6
 
       - name: k6 run
-        run: k6 run --env SCENARIO=${{ inputs.scenario }} tests/load/public-load.js
+        run: |
+          mkdir -p tests/reports/k6
+          k6 run --env SCENARIO=${{ inputs.scenario }} --env LATENCY_THRESHOLD_MS=25000 tests/load/public-load.js
 
       - name: Subir reporte de k6
         if: always()

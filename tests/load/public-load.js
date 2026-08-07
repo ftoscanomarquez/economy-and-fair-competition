@@ -21,6 +21,13 @@ import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporte
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3100";
 const POST_SLUG = __ENV.POST_SLUG || "controversias-omc-perspectiva-institucional";
 const SCENARIO = __ENV.SCENARIO || "both";
+// Runners compartidos de GitHub Actions (2 vCPU, sin réplicas) tienen mucha
+// menos capacidad que el hardware de referencia documentado en INFRA.md —
+// bajo 500 VUs instantáneos el event loop se satura y la latencia sube sin
+// que haya errores de negocio reales. LATENCY_THRESHOLD_MS permite relajar
+// el umbral solo quien lo pase explícitamente (ej. el workflow load-test.yml
+// en CI); el valor por defecto sigue siendo el SLA real para uso local.
+const LATENCY_THRESHOLD_MS = __ENV.LATENCY_THRESHOLD_MS || "12000";
 
 const errorRate = new Rate("errores_negocio");
 const pageLoadTrend = new Trend("duracion_pagina_publica");
@@ -64,7 +71,7 @@ export const options = {
     // encolamiento del event loop, no por errores: el umbral duro es 0% de fallos,
     // la latencia se documenta como hallazgo en vez de forzar un SLA irreal aquí.
     http_req_failed: ["rate<0.01"], // menos de 1% de errores HTTP
-    http_req_duration: ["p(95)<12000"],
+    http_req_duration: [`p(95)<${LATENCY_THRESHOLD_MS}`],
     errores_negocio: ["rate<0.01"],
   },
 };
