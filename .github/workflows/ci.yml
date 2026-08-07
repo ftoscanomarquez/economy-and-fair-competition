@@ -119,6 +119,24 @@ jobs:
       - name: Instalar navegadores de Playwright
         run: npx playwright install --with-deps chromium
 
+      - name: Generar .env para los scripts de seed
+        # scripts/seed-*.ts usan `tsx --env-file=.env` (mismo patrón que en
+        # desarrollo local) — no leen process.env directamente, así que las
+        # variables del bloque env: del job no les llegan sin este archivo.
+        run: |
+          cat > .env <<EOF
+          NODE_ENV=${{ env.NODE_ENV }}
+          NEXT_PUBLIC_SITE_URL=${{ env.NEXT_PUBLIC_SITE_URL }}
+          MONGODB_URI=${{ env.MONGODB_URI }}
+          MONGODB_DB=${{ env.MONGODB_DB }}
+          MAILPIT_HOST=${{ env.MAILPIT_HOST }}
+          MAILPIT_PORT=${{ env.MAILPIT_PORT }}
+          MAILPIT_UI_URL=${{ env.MAILPIT_UI_URL }}
+          CONTACT_NOTIFICATION_EMAIL=${{ env.CONTACT_NOTIFICATION_EMAIL }}
+          JWT_SECRET=${{ env.JWT_SECRET }}
+          ADMIN_ALLOWED_EMAILS=${{ env.ADMIN_ALLOWED_EMAILS }}
+          EOF
+
       - name: Sembrar base de datos (schema + imágenes + contenido real + posts)
         run: npm run seed:all
 
