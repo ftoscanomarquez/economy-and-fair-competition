@@ -8,7 +8,7 @@
 
 ## Estado actual
 
-**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo ya está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta: `ci.yml` (build/lint/typecheck/Vitest/Semgrep/Playwright E2E) automático en push y PR a `main`; `load-test.yml` (k6) manual bajo demanda — ambos verificados en verde con corridas reales.
+**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta (`ci.yml` automático, `load-test.yml` manual), y el sitio está desplegado en producción real en Vercel (`https://economy-and-fair-competition.vercel.app`). Pendiente: configurar Resend (correo real de producción) y migrar `lib/uploads.ts` a un storage persistente (Vercel Blob) antes de subir contenido nuevo en producción.
 **Última actualización:** 2026-08-07
 
 ---
@@ -648,6 +648,30 @@ El usuario pidió correr el workflow manual de k6 para confirmarlo end-to-end. S
 2. El único threshold real que se cruzó fue `http_req_duration: p(95)<12000` (el SLA de referencia, documentado en `INFRA.md`, medido contra el hardware dedicado del entorno de desarrollo) — bajo 500 VUs instantáneos en el runner compartido de GitHub Actions (2 vCPU, sin réplicas), el p95 real fue de ~31s. No es una regresión de la app: `http_req_failed` fue `rate: 0` (cero errores). Corregido haciendo el umbral de latencia configurable vía `LATENCY_THRESHOLD_MS` (nueva env var opcional en `tests/load/public-load.js`, default `12000` sin cambios para uso local); `load-test.yml` lo pasa como `25000` específicamente para el contexto de CI, dejando intacto el SLA real para cualquier corrida local contra hardware de referencia.
 
 **Tercer intento de `load-test.yml`: éxito completo.** `k6 (spike)` en verde en 2m12s, reporte HTML subido correctamente como artifact `k6-report`. Los dos workflows de GitHub Actions (`ci.yml` automático en push/PR, `load-test.yml` manual bajo demanda) quedan verificados en verde de punta a punta con corridas reales.
+
+## 2026-08-07 — Primer deploy real a Vercel (producción)
+
+El usuario pidió configurar el correo real de producción (Resend, hasta ahora solo probado vía Mailpit en dev) — al revisar `lib/mailer.ts` se confirmó que el switch Mailpit/Resend por `NODE_ENV` ya estaba implementado correctamente y no necesitaba cambios de código, solo faltaba: (a) una `RESEND_API_KEY` real (vacía en `.env` local) y (b) desplegar el sitio a algún lado donde `NODE_ENV=production` sea real. El usuario decidió primero desplegar a Vercel y configurar Resend después.
+
+**Vinculación del proyecto:**
+- `vercel link` creó el proyecto `vercel-toscano-team/economy-and-fair-competition`, pero la conexión automática a GitHub falló la primera vez — la GitHub App de Vercel no tenía autorizado el repo (solo tenía `ftoscanomarquez/meli-projects` en su lista de "Only select repositories"). El usuario lo agregó manualmente desde `github.com/settings/installations` (Select repositories → agregar `economy-and-fair-competition` → Save), tras resolver un `sudo mode` de GitHub que pedía un código de verificación por correo (tardó unos minutos en llegar, nada anómalo). Con eso, `vercel git connect` conectó correctamente.
+
+**Variables de entorno de producción** (`vercel env add ... production`, vía stdin para no exponer valores sensibles en el historial de shell):
+- `MONGODB_URI`/`MONGODB_DB`: el mismo Atlas real ya usado en desarrollo (mismo cluster, mismos datos — no se creó un cluster de producción separado).
+- `JWT_SECRET`: generado nuevo (`crypto.randomBytes(32).toString('hex')`), distinto al de dev — nunca reusar secretos de sesión entre entornos.
+- `AI_CONFIG_ENCRYPTION_KEY`: generado nuevo también, mismo criterio.
+- `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`: reusados tal cual del `.env` local (decisión del usuario — más simple, el gasto se comparte entre dev y producción).
+- `CONTACT_NOTIFICATION_EMAIL`, `ADMIN_ALLOWED_EMAILS`, `MAIL_FROM`: trasladados tal cual.
+- `NEXT_PUBLIC_SITE_URL`: configurado con la URL esperada de Vercel (`https://economy-and-fair-competition.vercel.app`) antes del primer deploy — coincidió exactamente con la URL real asignada.
+- `RESEND_API_KEY`: dejada sin configurar intencionalmente — el correo en producción no funcionará hasta que el usuario cree cuenta en Resend, verifique el dominio, y agregue la key real (tarea pendiente aparte).
+
+**Primer deploy (`vercel deploy --prod`): build exitoso pero sitio caído en producción (500 en todas las rutas).** Log de runtime (`vercel logs`) mostró la causa exacta: `EROFS: read-only file system, open '/var/task/logs/app.log'` — `lib/logger.ts` siempre escribía Pino a un archivo físico en producción (`pino.destination({ dest: logFilePath })`, sin importar la plataforma), pero Vercel usa un filesystem de solo lectura para el código desplegado (mismo tipo de restricción de disco no persistente ya identificado para `public/uploads/`, pero aquí sí bloqueante — tumbaba cada request, no solo perdía archivos). Corregido: el logger ahora detecta `process.env.VERCEL` (variable que la plataforma inyecta automáticamente en runtime) y, si está presente en producción, escribe a `stdout` (`pino.destination(1)`) en vez de a archivo — Vercel captura stdout/stderr como logs sin configuración adicional. El comportamiento de archivo físico se mantiene intacto para desarrollo local y para cualquier despliegue propio con disco persistente (Docker, VPS).
+
+**Segundo deploy: éxito.** `https://economy-and-fair-competition.vercel.app/es` responde 200, contenido real de Mongo Atlas (título, hero, imágenes) confirmado visualmente con captura — idéntico a local.
+
+**Pendientes explícitos, no bloqueantes para este deploy:**
+- Configurar Resend (cuenta + dominio verificado + `RESEND_API_KEY` real en Vercel) — el formulario de contacto y el login por magic link no funcionarán en producción hasta entonces.
+- Migrar `lib/uploads.ts` a Vercel Blob (o similar) antes de que alguien suba contenido nuevo desde el admin en producción — el filesystem de Vercel no persiste entre deploys, cualquier imagen subida ahí se perdería en el siguiente deploy. Se detectó también un warning de build de Turbopack (no bloqueante) sobre tracing de todo el filesystem por los `path.resolve`/`fs` dinámicos de `lib/uploads.ts` — revisar junto con la migración a Blob.
 
 ## Cómo retomar si se interrumpe el trabajo
 
