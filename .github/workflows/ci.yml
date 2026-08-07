@@ -45,6 +45,21 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Diagnóstico temporal — inspeccionar node_modules instalado
+        run: |
+          echo "node -v: $(node -v)"
+          echo "npm -v: $(npm -v)"
+          echo "npm config list:"
+          npm config list
+          echo "--- .npmrc en el repo ---"
+          cat .npmrc || echo "(no existe)"
+          echo "--- conteo node_modules top-level ---"
+          find node_modules -maxdepth 1 -type d | wc -l
+          echo "--- @types/react ---"
+          ls -la node_modules/@types/react/ 2>&1 || echo "NO EXISTE @types/react"
+          echo "--- react ---"
+          ls -la node_modules/react/ 2>&1 || echo "NO EXISTE react"
+
       - name: Typecheck
         run: npm run typecheck
 
