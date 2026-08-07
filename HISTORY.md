@@ -595,6 +595,36 @@ El usuario pidió preparar el proyecto para subirlo a GitHub (`https://github.co
 
 **Pendiente / anotado para después:** en Vercel el filesystem no persiste entre despliegues — cualquier imagen que un admin suba en producción a `public/uploads/` desaparecerá en el siguiente deploy si no se resuelve almacenamiento persistente (S3/Blob storage) antes de ese lanzamiento. No bloqueante para el CI/CD que se implementa a continuación, pero es una decisión pendiente antes de un deploy de producción real en Vercel.
 
+## 2026-08-06 — Repo subido a GitHub + CI/CD (build, lint, Vitest, Playwright, Semgrep, k6 manual)
+
+Primer push del proyecto a `https://github.com/ftoscanomarquez/economy-and-fair-competition` (no era repo git hasta ahora), con GitHub Actions configurado.
+
+**Repositorio:**
+- `git init` + `git remote add origin` + primer commit (237 archivos, incluyendo las 30 imágenes reales de `content/seed-images/`, ~59MB, versionadas deliberadamente para que un clon nuevo arranque con contenido real).
+- Se eliminó un directorio artefacto `C:/` vacío (creado por un comando bash anterior en esta sesión que interpretó mal una ruta absoluta de Windows) — git en Windows no puede ignorar ni versionar un directorio con ese nombre literal (lo trata como prefijo de unidad), así que se borró en vez de excluirlo por patrón.
+- Se excluyeron del repo `.claude/`, `.codex/`, `.impeccable/` (config local de asistentes de IA con rutas absolutas de esta máquina, sin secretos pero no portable).
+- El repo remoto ya tenía un commit inicial autogenerado por GitHub (`README.md` de una línea) — se resolvió con `git merge --allow-unrelated-histories`, conservando el `README.md` real del proyecto sobre el placeholder.
+
+**GitHub Actions (`.github/workflows/`):**
+- `ci.yml`, dispara en push a `main` y en todo Pull Request hacia `main`:
+  - `build-and-unit-tests`: `npm ci` → `typecheck` → `lint` → `test` (Vitest) → `build` (Next.js). No depende de servicios externos, es el gate rápido.
+  - `e2e`: Playwright completo, con **Mongo (`mongo:7`) y Mailpit (`axllent/mailpit`) como servicios Docker efímeros del propio job** — se destruyen al terminar, nunca tocan el Atlas ni el Mailpit reales de desarrollo. Corre `npm run seed:all` (schema + imágenes + content_items reales + posts) antes de los tests, igual que un entorno de desarrollo nuevo. Requiere el repository secret `CI_JWT_SECRET` (valor de prueba, generado con el mismo comando que documenta `.env.example`, sin relación con el `JWT_SECRET` real de producción en Vercel).
+  - `semgrep`: SAST vía la imagen oficial `semgrep/semgrep`, en paralelo, `continue-on-error: true` (no bloquea el pipeline por hallazgos, el reporte HTML queda como artefacto para revisión humana — mismo criterio que el flujo local ya documentado en `QUICK-START.md`).
+  - Los 3 jobs suben sus reportes (Vitest/Playwright/Semgrep HTML) como artifacts de la corrida (14 días de retención).
+- `load-test.yml` (nuevo, **disparo manual únicamente** vía `workflow_dispatch`, con un selector de escenario spike/sustained/both): no corre en cada push — k6 es pesado y no aporta valor en cada commit. Levanta Mongo efímero, siembra, hace `next build` + `next start`, espera con `wait-on`, instala k6 desde su repositorio APT oficial, y corre `tests/load/public-load.js` contra el servidor real recién levantado.
+
+**Decisiones explicadas al usuario durante esta tarea** (por qué Playwright necesita Mongo/JWT/Mailpit en CI, qué es un "runner", por qué el filesystem de Vercel no persiste): confirmado que el usuario entendió el modelo antes de aprobarlo, no se asumió.
+
+**Pendiente de acción manual del usuario:** crear el repository secret `CI_JWT_SECRET` en GitHub (Settings → Secrets and variables → Actions) con el valor de prueba generado en esta sesión — confirmado por el usuario como ya hecho antes del push.
+
+**Validado:** `npx tsc --noEmit`, `npm run lint`, `npm run build` (producción, contra el `.env` real) y ambos YAML (`ci.yml`, `load-test.yml`) verificados sintácticamente válidos con `js-yaml` antes del push. La ejecución real del pipeline en GitHub Actions queda pendiente de observar en la pestaña Actions del repo tras este push.
+
+**Primer run real de CI (post-push), dos fallos corregidos:**
+1. `npm ci` fallaba con `ERESOLVE` — `newman-reporter-html@1.0.5` declara `peer newman@"4"`, pero el proyecto usa `newman@6.2.2`. Localmente pasaba desapercibido porque `npm install` (a diferencia de `npm ci`, más estricto) tolera ese conflicto sin fallar. Corregido agregando `.npmrc` con `legacy-peer-deps=true` (aplica tanto en CI como en cualquier instalación local futura) y regenerando `package-lock.json` en consecuencia.
+2. El job de Semgrep fallaba con `node: not found` — corría dentro de `container: image: semgrep/semgrep`, una imagen sin Node preinstalado; `actions/setup-node@v4` no puede instalar Node dentro de un contenedor de job (solo prepara el runner host). Corregido: el job vuelve a un `ubuntu-latest` normal (con Node ya disponible vía `setup-node`) y Semgrep se invoca con `docker run --rm -v "$PWD:/src" semgrep/semgrep semgrep scan ...` en vez de como contenedor del job completo.
+
+Ambos corregidos y verificados localmente (`npm ci`, `tsc`, `lint`, Vitest limpios con el lockfile regenerado) antes de un segundo push con la corrección.
+
 ## Cómo retomar si se interrumpe el trabajo
 
 1. Leer esta sección "Estado actual" para saber la fase activa.

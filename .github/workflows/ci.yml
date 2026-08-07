@@ -130,20 +130,26 @@ jobs:
   semgrep:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Semgrep scan
-        run: semgrep scan --config auto --json --output tests/reports/semgrep/report.json .
-        continue-on-error: true
-
-      - name: Configurar Node (para el generador de reporte HTML)
+      - name: Configurar Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.9.0"
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Semgrep scan
+        # Corre en un job normal (con Node ya disponible para el paso
+        # siguiente) en vez de container: image: semgrep/semgrep — esa imagen
+        # no trae Node preinstalado y actions/setup-node no puede instalarlo
+        # dentro de un contenedor de job. La propia imagen oficial de Semgrep
+        # se usa aquí solo para ejecutar el binario vía `docker run`.
+        run: |
+          mkdir -p tests/reports/semgrep
+          docker run --rm -v "$PWD:/src" semgrep/semgrep \
+            semgrep scan --config auto --json --output /src/tests/reports/semgrep/report.json /src
+        continue-on-error: true
 
       - name: Generar reporte HTML
         run: node scripts/semgrep-html-report.mjs
