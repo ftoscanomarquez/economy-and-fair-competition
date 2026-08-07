@@ -2,7 +2,33 @@
 
 > Diagramas de clase, máquina de estados, secuencia y modelo de persistencia. Se completan en Fase 11 cuando la arquitectura de todas las fases está implementada y estable. Esqueleto y primer diagrama de contexto creados en Fase 0.
 
-## Diagrama de contexto general (borrador, se refina en Fase 11)
+## Diagrama de contexto general — producción real (Vercel, cerrado 2026-08-07)
+
+```mermaid
+graph TD
+    Visitor[Visitante público] -->|HTTPS economyandfaircompetition.com| VercelEdge[Vercel Edge Network<br/>TLS + reescritura X-Forwarded-For]
+    Admin[Administrador] -->|Magic Link + JWT| VercelEdge
+    WhatsAppUser[Admin vía WhatsApp] -->|Proveedor MCP| MCPEndpoint["/api/mcp/route"]
+
+    VercelEdge --> NextApp[Next.js App Router<br/>función serverless]
+    MCPEndpoint --> NextApp
+
+    NextApp -->|lib/db.ts| MongoAtlas[(MongoDB Atlas<br/>cluster-economy, mismo cluster dev/prod)]
+    NextApp -->|lib/mailer.ts, NODE_ENV=development| Mailpit[Mailpit - dev local]
+    NextApp -->|lib/mailer.ts + circuit breaker, NODE_ENV=production| Resend[Resend API - prod<br/>PENDIENTE: RESEND_API_KEY sin configurar]
+    NextApp -->|lib/uploads.ts, BLOB_READ_WRITE_TOKEN presente| VercelBlob[Vercel Blob público<br/>imágenes subidas en producción]
+    NextApp -->|lib/uploads.ts, sin BLOB_READ_WRITE_TOKEN| Uploads[public/uploads - disco local<br/>solo dev / despliegue propio]
+    NextApp -->|lib/logger.ts, VERCEL presente + NODE_ENV=production| Stdout[stdout → panel de logs de Vercel]
+    NextApp -->|lib/logger.ts, resto de entornos| LogFile[logs/app.log - Pino JSON]
+
+    GitHub[GitHub ftoscanomarquez/economy-and-fair-competition] -->|push a main| VercelDeploy[Vercel auto-deploy]
+    VercelDeploy --> NextApp
+    GitHub -->|push/PR a main| GHActions[GitHub Actions ci.yml<br/>build/lint/typecheck/Vitest/Semgrep/Playwright]
+```
+
+**Notas de la migración documentadas en `HISTORY.md`** (2026-08-07): el filesystem de Vercel es de solo lectura para el código desplegado y no persiste entre deploys — esto forzó dos cambios respecto al diseño original de "servidor propio" (`AGENTS.md` §1, `INFRA.md`): el logger escribe a `stdout` en vez de a archivo cuando corre en Vercel, y las imágenes subidas van a Vercel Blob en vez de a disco. Ambos cambios son automáticos (detectan el entorno vía `process.env.VERCEL`/`BLOB_READ_WRITE_TOKEN`) y no alteran el comportamiento en desarrollo local ni en un eventual despliegue propio con disco persistente.
+
+## Diagrama de contexto general original (borrador previo a Fase 11, referencia histórica de diseño)
 
 ```mermaid
 graph TD

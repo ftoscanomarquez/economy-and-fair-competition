@@ -4,14 +4,17 @@
 
 | Componente | Estado | Detalle |
 |---|---|---|
-| Base de datos | **Activo** | MongoDB Atlas, cluster `cluster-economy`, DB `economy-and-fair-competition-db` |
+| Hosting / despliegue | **Activo (producción real)** | Vercel, proyecto `vercel-toscano-team/economy-and-fair-competition`, dominio `economyandfaircompetition.com` (ver "Despliegue en Vercel" abajo) |
+| CI/CD | **Activo** | GitHub Actions — `ci.yml` automático en push/PR a `main` (build/lint/typecheck/Vitest/Semgrep/Playwright), `load-test.yml` (k6) manual bajo demanda |
+| Base de datos | **Activo** | MongoDB Atlas, cluster `cluster-economy`, DB `economy-and-fair-competition-db` — el mismo cluster para desarrollo y producción, sin instancia separada |
 | Correo (dev) | **Activo** | Mailpit compartido (`magic-link-mailpit`), SMTP `localhost:1025`, UI `localhost:8025` |
-| Correo (prod) | Pendiente de credenciales | Resend API |
-| Almacenamiento de archivos | **Activo** | Disco local (`./public/uploads`), no RustFS en este MVP |
-| Reverse proxy / SSL | No implementado | Ver `CERTIFICADOS.md` para activación futura con Traefik |
-| Gestión de secretos | No implementado | `.env` local únicamente; Vault documentado como upgrade futuro |
-| Observabilidad centralizada | No implementado | Pino JSON + archivo físico `logs/app.log`; ver `OBSERVABILIDAD.md` |
-| Análisis estático de calidad | Parcial | Semgrep (SAST) sí implementado; SonarQube documentado, no activo |
+| Correo (prod) | Pendiente de credenciales | Resend API — `RESEND_API_KEY` sin configurar en Vercel; login por magic link y formulario de contacto no envían correo real en producción hasta configurarse |
+| Almacenamiento de archivos (dev) | **Activo** | Disco local (`./public/uploads`), no RustFS en este MVP |
+| Almacenamiento de archivos (prod) | **Activo** | Vercel Blob (público) — el filesystem de Vercel es de solo lectura y no persiste entre deploys, ver "Despliegue en Vercel" abajo |
+| Reverse proxy / SSL | **Activo (gestionado por Vercel)** | Certificado TLS emitido y renovado automáticamente por Vercel al verificar el dominio; `CERTIFICADOS.md` documenta la alternativa Traefik solo para despliegues propios fuera de Vercel |
+| Gestión de secretos | Parcial | Variables de entorno de producción en Vercel (`vercel env`), cifradas en reposo por la plataforma; Vault documentado como upgrade futuro para despliegues propios |
+| Observabilidad centralizada | No implementado | Pino JSON — a archivo físico `logs/app.log` en dev/despliegues propios, a `stdout` en Vercel (capturado por su panel de logs); ver `OBSERVABILIDAD.md` |
+| Análisis estático de calidad | Parcial | Semgrep (SAST) sí implementado, corre en CI; SonarQube documentado, no activo |
 
 ## Requerimientos mínimos de hardware y software
 
@@ -53,6 +56,45 @@ Scripts: `tests/load/public-load.js` (flujo público) y `tests/load/mcp-load.js`
 - **Hallazgo de compatibilidad documentado**: en este entorno (Windows, Node 20.9+), Newman resuelve `http://localhost:PORT` de forma intermitente a una dirección inválida (`Invalid IP address: undefined`) en todas las requests de una corrida — no ocurre con `curl` ni en el navegador. Workaround: usar `http://127.0.0.1:PORT` como `baseUrl` en el environment en vez de `localhost` (ya aplicado en el environment del repo). Si se reintroduce `localhost`, confirmar que Newman siga resolviendo correctamente antes de asumir que un fallo masivo de conexión es un bug del servidor.
 - El paso "Leer código en Mailpit (manual)" requiere copiar el código de 6 dígitos desde `http://localhost:8025` (Mailpit, `admin`/`magiclink123`) a la variable `magicLinkCode` del environment antes de cada corrida completa — es un paso manual deliberado (ver comentario dentro del propio request de la colección: automatizarlo con `pm.sendRequest` anidado resultó frágil). Cada código de un solo uso solo sirve para una verificación; si se dispara `request-code` más de una vez antes de leer Mailpit, el código leído puede no corresponder al último registro generado en Mongo (`auth_codes`, ordenado por `createdAt`) — pedir el código y verificarlo en la misma pasada, sin llamadas intermedias a `request-code`.
 - Reporte HTML: `tests/reports/postman/index.html` (requiere `newman-reporter-html`, instalado como dependencia de desarrollo bajo demanda).
+
+## Despliegue en Vercel (producción)
+
+**Desplegado 2026-08-07.** El sitio corre en Vercel (`vercel-toscano-team/economy-and-fair-competition`), con el repo de GitHub conectado para auto-deploy en cada push a `main`. Documentado aquí porque cambia varios supuestos del resto de este archivo (almacenamiento, logging, proxy) respecto al escenario original de "servidor propio" descrito en la sección de hardware/software arriba.
+
+### Dominio
+
+- **Dominio de producción**: `economyandfaircompetition.com` — anteriormente en WordPress.com (nameservers `ns1/ns2/ns3.wordpress.com`, aún vigentes). Conectado a Vercel **sin migrar los nameservers**: se editaron dos registros DNS puntuales desde el panel de WordPress.com (`my.wordpress.com/domains/economyandfaircompetition.com/dns`) —
+  - `A` (nombre `@`, antes "Gestionado por WordPress.com") → `76.76.21.21` (IP anycast estándar de Vercel para dominios raíz).
+  - `CNAME` (nombre `www`, antes apuntaba al propio dominio de WordPress) → `cname.vercel-dns.com`.
+  - Todos los demás registros del dominio (`CNAME wpcloud1/2._domainkey`, `TXT _dmarc`, `TXT @ v=spf1`, `TXT _domainconnect` — todos de correo/autenticación de WordPress) se dejaron intactos.
+- **URL de fallback**: `economy-and-fair-competition.vercel.app` (asignada automáticamente por Vercel, sigue activa en paralelo al dominio propio).
+- Certificado TLS emitido y renovado automáticamente por Vercel tras la verificación DNS — no requiere gestión manual (a diferencia del flujo Traefik/Let's Encrypt descrito en `CERTIFICADOS.md`, que sigue siendo la referencia solo para un despliegue propio fuera de Vercel).
+- `getClientIp()` (`lib/rate-limit.ts`) — la advertencia de seguridad de la sección "Mapeo de resiliencia" de abajo (sobre `X-Forwarded-For` falsificable sin un proxy que lo reescriba) **queda mitigada en este despliegue**: la Edge Network de Vercel actúa como ese proxy confiable y sobrescribe `X-Forwarded-For` con la IP real de la conexión antes de reenviar la petición a la función serverless. El riesgo documentado sigue aplicando textualmente solo si el proyecto se despliega alguna vez fuera de Vercel sin un proxy equivalente delante.
+
+### Variables de entorno de producción
+
+Configuradas vía `vercel env add <nombre> production` (nunca en el repo). Deliberadamente **distintas** de las de desarrollo local donde aplica:
+- `MONGODB_URI` / `MONGODB_DB`: el mismo cluster Atlas de siempre — no hay un cluster de producción separado.
+- `JWT_SECRET` y `AI_CONFIG_ENCRYPTION_KEY`: generados nuevos (`crypto.randomBytes(32).toString('hex')`), distintos a los de `.env` local — nunca reusar secretos de sesión/cifrado entre entornos.
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`: reusados tal cual del `.env` local (decisión del usuario, el gasto se comparte entre dev y producción).
+- `CONTACT_NOTIFICATION_EMAIL`, `ADMIN_ALLOWED_EMAILS`, `MAIL_FROM`, `NEXT_PUBLIC_SITE_URL` (`https://economyandfaircompetition.com`): trasladados/ajustados al valor real de producción.
+- `RESEND_API_KEY`: **sin configurar** — pendiente explícito, ver tabla de estado arriba.
+- `BLOB_READ_WRITE_TOKEN`: inyectada automáticamente por Vercel al crear el Blob store (ver siguiente sección), no requiere configuración manual.
+
+### Almacenamiento de archivos: Vercel Blob
+
+El filesystem de una función serverless de Vercel es de solo lectura (salvo `/tmp`, no persistente entre invocaciones) y no persiste entre deploys — un archivo escrito a `public/uploads/` en runtime desaparecería de inmediato o en el siguiente deploy. Esto se descubrió en producción real: el primer deploy mostraba el sitio sin ninguna imagen (`public/uploads/` en el repo solo tiene `.gitkeep`, correctamente gitignored — las imágenes de arranque solo existían en disco local, sembradas ahí vía `npm run seed:images`, nunca en el deploy).
+
+Resuelto migrando `lib/uploads.ts` a **Vercel Blob** (paquete `@vercel/blob`):
+- Store creado con `vercel blob create-store economy-and-fair-competition-uploads --access public --yes`, conectado automáticamente al proyecto.
+- `saveBuffer()` (usado por `saveImageBuffer`/`saveDocumentBuffer`) bifurca en `process.env.BLOB_READ_WRITE_TOKEN`: si está presente, sube con `put(pathname, buffer, { access: "public" })`; si no, mismo comportamiento de siempre a disco local. **No requiere ningún cambio en el flujo de subida desde el admin** — el contrato `{ url }` de `/api/uploads` es idéntico en ambos casos.
+- `next.config.ts` → `images.remotePatterns` permite `*.public.blob.vercel-storage.com` (`next/image` bloquea por defecto cualquier origen de imagen no listado).
+- Las 30 imágenes de arranque ya sembradas en Mongo (vía `content/seed-images/` + `npm run seed:images` en local) se migraron a Blob una sola vez con `scripts/migrate-uploads-to-blob.ts`, que sube cada archivo referenciado y reescribe la URL en `content_items`, `site_texts` y `posts` de la ruta relativa (`/uploads/<seccion>/archivo.ext`) a la URL absoluta de Blob.
+- Cualquier imagen nueva que el admin suba en producción a partir de ahora se guarda directamente en Blob, sin pasos manuales adicionales.
+
+### Logging
+
+`lib/logger.ts` (Pino) escribía siempre a un archivo físico en producción (`pino.destination({ dest: logFilePath })`), que en el primer deploy tumbó el sitio entero con `EROFS: read-only file system` en cada request. Corregido: cuando `process.env.VERCEL` está presente (variable que la plataforma inyecta automáticamente en runtime) y `NODE_ENV=production`, el logger escribe a `stdout` en vez de a archivo — Vercel captura stdout/stderr como logs de la función sin configuración adicional, visibles en `vercel logs <deployment-url>` o el dashboard. El comportamiento de archivo físico se mantiene sin cambios para desarrollo local y para cualquier despliegue propio con disco persistente (Docker, VPS).
 
 ## Mapeo de resiliencia
 

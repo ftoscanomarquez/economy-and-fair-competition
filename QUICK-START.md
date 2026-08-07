@@ -333,3 +333,30 @@ docker compose --profile observability up -d
 ## Mailpit (ya activo, compartido)
 
 UI web: http://localhost:8025 (usuario `admin` / contraseña `magiclink123`) — todos los correos enviados en desarrollo (magic link, formulario de contacto) aparecen aquí, no se envían realmente.
+
+## Despliegue a producción (Vercel)
+
+El sitio está en producción real en `https://economyandfaircompetition.com` (Vercel, proyecto `vercel-toscano-team/economy-and-fair-competition`). Detalle completo de la configuración en `INFRA.md` § "Despliegue en Vercel" — esta sección solo cubre comandos operativos del día a día.
+
+**El repo está conectado a GitHub para auto-deploy**: cada push a `main` dispara un deploy nuevo automáticamente. No suele ser necesario desplegar manualmente.
+
+```bash
+# Deploy manual a producción (si hace falta, ej. para probar un cambio de env var sin esperar el push)
+vercel deploy --prod
+
+# Ver logs en vivo/recientes de producción
+vercel logs https://economyandfaircompetition.com
+
+# Listar variables de entorno de producción configuradas
+vercel env ls production
+
+# Agregar/actualizar una variable de entorno de producción (no se puede editar in-place: quitar y volver a agregar)
+vercel env rm NOMBRE_VARIABLE production --yes
+echo "valor" | vercel env add NOMBRE_VARIABLE production
+# tras cambiar una env var, hace falta un nuevo deploy para que el build la recoja:
+vercel deploy --prod
+```
+
+**Imágenes subidas en producción**: van automáticamente a Vercel Blob (no a disco, que no persiste en Vercel) — no requiere ningún paso manual, `lib/uploads.ts` lo detecta solo vía `BLOB_READ_WRITE_TOKEN`. Ver `INFRA.md` para el detalle de por qué y cómo se migraron las imágenes de arranque.
+
+**Pendiente**: `RESEND_API_KEY` sin configurar en producción — el login por magic link y el formulario de contacto no envían correo real hasta que se complete (crear cuenta en Resend, verificar un dominio, agregar la key con `vercel env add RESEND_API_KEY production`).

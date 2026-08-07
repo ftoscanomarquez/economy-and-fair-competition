@@ -8,7 +8,7 @@
 
 ## Estado actual
 
-**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta (`ci.yml` automático, `load-test.yml` manual), y el sitio está desplegado en producción real en Vercel (`https://economy-and-fair-competition.vercel.app`). Pendiente: configurar Resend (correo real de producción) y migrar `lib/uploads.ts` a un storage persistente (Vercel Blob) antes de subir contenido nuevo en producción.
+**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta (`ci.yml` automático, `load-test.yml` manual), y el sitio está en producción real en el dominio propio `https://economyandfaircompetition.com` (Vercel), con imágenes servidas desde Vercel Blob. Pendiente: configurar Resend (correo real de producción, hoy sin `RESEND_API_KEY`).
 **Última actualización:** 2026-08-07
 
 ---
@@ -688,6 +688,21 @@ El dominio real de la firma (`economyandfaircompetition.com`) vivía en WordPres
 - **Confirmado con curl real**: `https://economyandfaircompetition.com/es` responde `200`, con SSL válido (certificado emitido automáticamente por Vercel tras la verificación DNS).
 
 **Pendiente explícito**: el correo (Resend) sigue sin resolverse — decisión del usuario de posponerlo hasta que el dominio del sitio quedara funcionando. Cuando se retome, evaluar si el dominio técnico de envío será un subdominio de `minegocito.app` (Cloudflare, más simple de verificar) o `economyandfaircompetition.com` (ahora que su DNS es editable vía WordPress.com, aunque con más riesgo de tocar registros ya usados por el correo actual de WordPress).
+
+## 2026-08-07 — Imágenes rotas en producción: migración a Vercel Blob
+
+Tras conectar el dominio propio, el usuario reportó que las imágenes no cargaban en ningún dominio de Vercel (ni el custom ni `*.vercel.app`) — confirmado con `curl` que todas las rutas `/uploads/...` devolvían 404 reales. Causa raíz: `public/uploads/` está en `.gitignore` (correctamente, es zona de trabajo del admin) y solo tiene `.gitkeep` versionado — el deploy de Vercel nunca tuvo las imágenes reales, que solo existían en el disco local donde se había corrido `npm run seed:images`. Esto es exactamente el escenario de storage no persistente ya anticipado y documentado como pendiente en la entrada del primer deploy, ahora confirmado en producción real.
+
+**Migración a Vercel Blob** (`@vercel/blob`, instalado):
+- `vercel blob create-store economy-and-fair-competition-uploads --access public --yes` creó el store y lo conectó automáticamente al proyecto, inyectando `BLOB_READ_WRITE_TOKEN` en producción y descargándolo a `.env.local` (gitignored) para uso local.
+- `lib/uploads.ts` reescrito: `saveBuffer()` ahora sube a Blob (`put()`, acceso público) cuando `process.env.BLOB_READ_WRITE_TOKEN` está presente, con fallback a disco local sin cambios de comportamiento cuando no lo está (desarrollo local, despliegues propios con filesystem persistente). `fileExistsForUrl()`/`deleteUploadedFile()` distinguen URLs de Blob (absolutas, `https://...`) de rutas locales (`/uploads/...`) para usar `head()`/`del()` de Blob o `fs.access()`/`fs.unlink()` según corresponda. El contrato público (`{ url }` devuelto por `/api/uploads`) no cambió — ningún componente cliente necesitó modificarse.
+- `next.config.ts`: `images.remotePatterns` ahora permite `*.public.blob.vercel-storage.com` (`next/image` bloquea por defecto cualquier origen no listado).
+- `scripts/migrate-uploads-to-blob.ts` (nuevo, corrido una vez): sube a Blob cada archivo referenciado desde `content_items.imageUrl`, `site_texts["home.hero.image"]`, `posts.thumbnailUrl` y bloques `hero`/`twoColumn`, y actualiza cada URL en Mongo de la ruta relativa (`/uploads/<seccion>/archivo.ext`) a la URL absoluta de Blob. Corrido contra Mongo Atlas real: 34 archivos subidos, 28 documentos actualizados.
+- `.env.example` documentado con `BLOB_READ_WRITE_TOKEN` y su procedencia.
+
+**Validado**: tras el deploy con estos cambios, verificación real con Playwright (`page.on("response")` filtrando por `blob.vercel-storage.com`/`/_next/image`) — cero requests fallidos, captura de pantalla confirma la imagen del hero y el resto del contenido cargando correctamente en `https://economyandfaircompetition.com/es`.
+
+**Confirmado con el usuario**: cualquier imagen que se suba desde el admin en producción (items de contenido, hero, bloques de posts, generación con IA) ahora se sube automáticamente a Vercel Blob sin cambio alguno en el flujo de la interfaz — el mismo endpoint `/api/uploads`, la bifurcación es interna a `lib/uploads.ts`.
 
 ## Cómo retomar si se interrumpe el trabajo
 
