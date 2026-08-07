@@ -15,6 +15,19 @@ jobs:
   build-and-unit-tests:
     name: Build, lint, typecheck y Vitest
     runs-on: ubuntu-latest
+    env:
+      # Variables mínimas requeridas por lib/env.ts (ver Zod schema) — tanto
+      # Vitest (importa lib/db.ts/lib/logger.ts indirectamente) como el build
+      # de Next.js las necesitan para que getEnv() no falle. Valores de
+      # prueba, sin relación con las credenciales reales de producción (esas
+      # viven solo en Vercel).
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DB: economy-and-fair-competition-ci
+      CONTACT_NOTIFICATION_EMAIL: contacto@economyandfaircompetition.com
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      ADMIN_ALLOWED_EMAILS: admin@economyandfaircompetition.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,18 +52,6 @@ jobs:
 
       - name: Build (Next.js)
         run: npm run build
-        env:
-          # Variables mínimas requeridas por lib/env.ts (ver Zod schema) para
-          # que `next build` pueda evaluar rutas server-side en build time.
-          # Valores de prueba, sin relación con las credenciales reales de
-          # producción (esas viven solo en Vercel).
-          NODE_ENV: production
-          NEXT_PUBLIC_SITE_URL: http://localhost:3100
-          MONGODB_URI: mongodb://localhost:27017
-          MONGODB_DB: economy-and-fair-competition-ci
-          CONTACT_NOTIFICATION_EMAIL: contacto@economyandfaircompetition.com
-          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
-          ADMIN_ALLOWED_EMAILS: admin@economyandfaircompetition.com
 
       - name: Subir reporte de Vitest
         if: always()

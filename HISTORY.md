@@ -625,6 +625,8 @@ Primer push del proyecto a `https://github.com/ftoscanomarquez/economy-and-fair-
 
 Ambos corregidos y verificados localmente (`npm ci`, `tsc`, `lint`, Vitest limpios con el lockfile regenerado) antes de un segundo push con la corrección.
 
+**Segundo run real, tercer fallo corregido:** `npm ci`/lint/typecheck ya pasaban, pero `Vitest` fallaba con `Variables de entorno inválidas` (`NEXT_PUBLIC_SITE_URL`, `MONGODB_URI`, etc. requeridas) — `tests/unit/setup.ts` lee `.env` del disco solo como fallback (nunca sobreescribe variables ya presentes en `process.env`), pero yo había puesto esas variables de prueba solo en el paso `Build (Next.js)` del `ci.yml`, no a nivel de todo el job — el paso `Vitest` corre antes y no las veía. Corregido moviendo el bloque `env:` al nivel del job `build-and-unit-tests` completo, para que tanto `Vitest` como `Build` las hereden.
+
 ## Cómo retomar si se interrumpe el trabajo
 
 1. Leer esta sección "Estado actual" para saber la fase activa.
