@@ -673,6 +673,22 @@ El usuario pidió configurar el correo real de producción (Resend, hasta ahora 
 - Configurar Resend (cuenta + dominio verificado + `RESEND_API_KEY` real en Vercel) — el formulario de contacto y el login por magic link no funcionarán en producción hasta entonces.
 - Migrar `lib/uploads.ts` a Vercel Blob (o similar) antes de que alguien suba contenido nuevo desde el admin en producción — el filesystem de Vercel no persiste entre deploys, cualquier imagen subida ahí se perdería en el siguiente deploy. Se detectó también un warning de build de Turbopack (no bloqueante) sobre tracing de todo el filesystem por los `path.resolve`/`fs` dinámicos de `lib/uploads.ts` — revisar junto con la migración a Blob.
 
+## 2026-08-07 — Dominio propio conectado: economyandfaircompetition.com apuntando a Vercel
+
+El dominio real de la firma (`economyandfaircompetition.com`) vivía en WordPress.com, con WordPress.com administrando también el DNS completo (nameservers `ns1/ns2/ns3.wordpress.com`) — confirmado con `nslookup -type=NS`. El usuario también tiene un dominio propio en Cloudflare (`minegocito.app`, fuera del alcance de esta sesión) que se reserva para el tema de correo (Resend) en un paso posterior, no para el sitio.
+
+**Decisión de estrategia**: en vez de mover la gestión DNS completa a Cloudflare como paso intermedio, se conectó `economyandfaircompetition.com` **directo** a Vercel — menos capas, un solo cambio. WordPress.com permite editar registros DNS individuales del dominio sin cambiar los nameservers, así que no fue necesario mover el dominio entero.
+
+- `vercel domains add economyandfaircompetition.com` (a nivel de team) + `vercel domains add economyandfaircompetition.com economy-and-fair-competition` (vinculado al proyecto).
+- `vercel domains inspect` devolvió el registro exacto requerido: `A economyandfaircompetition.com → 76.76.21.21` (IP anycast estándar de Vercel para dominios raíz, confirmada dos veces antes de que el usuario la aplicara).
+- El usuario, guiado paso a paso en `my.wordpress.com/domains/economyandfaircompetition.com/dns`, eliminó el registro `A` gestionado por WordPress (apuntaba al hosting de WordPress) y agregó uno nuevo: tipo `A`, nombre vacío (dominio raíz), valor `76.76.21.21`. Editó también el `CNAME www` existente para apuntar a `cname.vercel-dns.com` en vez de al propio `economyandfaircompetition.com`.
+- Se dejaron intactos, deliberadamente, todos los registros de correo/autenticación de WordPress (`CNAME wpcloud1/2._domainkey`, `TXT _dmarc`, `TXT @ v=spf1`, `TXT _domainconnect`) — no relacionados con el sitio, y se reemplazarán solo si el correo termina configurándose en este mismo dominio más adelante.
+- Propagación casi instantánea: `nslookup economyandfaircompetition.com` → `76.76.21.21`; `nslookup www.economyandfaircompetition.com` → `cname.vercel-dns.com`. `vercel domains inspect` dejó de mostrar el warning de configuración incorrecta.
+- `NEXT_PUBLIC_SITE_URL` en Vercel actualizado de la URL placeholder (`economy-and-fair-competition.vercel.app`) al dominio real (`https://economyandfaircompetition.com`), seguido de un redeploy para que el build lo recoja.
+- **Confirmado con curl real**: `https://economyandfaircompetition.com/es` responde `200`, con SSL válido (certificado emitido automáticamente por Vercel tras la verificación DNS).
+
+**Pendiente explícito**: el correo (Resend) sigue sin resolverse — decisión del usuario de posponerlo hasta que el dominio del sitio quedara funcionando. Cuando se retome, evaluar si el dominio técnico de envío será un subdominio de `minegocito.app` (Cloudflare, más simple de verificar) o `economyandfaircompetition.com` (ahora que su DNS es editable vía WordPress.com, aunque con más riesgo de tocar registros ya usados por el correo actual de WordPress).
+
 ## Cómo retomar si se interrumpe el trabajo
 
 1. Leer esta sección "Estado actual" para saber la fase activa.
