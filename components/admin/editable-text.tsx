@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 type EditableTextProps = {
   textKey: string;
   value: string;
-  as?: "span" | "p" | "h1" | "h2" | "h3";
+  as?: "span" | "p" | "h1" | "h2" | "h3" | "dt" | "dd";
   className?: string;
   multiline?: boolean;
 };

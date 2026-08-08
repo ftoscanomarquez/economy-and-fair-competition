@@ -50,10 +50,18 @@ export function Hero({ texts }: { texts: Record<string, string> }) {
         <dl className="grid animate-fade-up grid-cols-1 gap-8 border-t border-border pt-10 sm:grid-cols-3 lg:max-w-2xl">
           {(["stat1", "stat2", "stat3"] as const).map((stat) => (
             <div key={stat}>
-              <dt className="font-display text-display-md font-medium text-ink">
-                {t(texts, `home.hero.${stat}.value`)}
-              </dt>
-              <dd className="mt-1 text-sm text-ink-soft">{t(texts, `home.hero.${stat}.label`)}</dd>
+              <EditableText
+                as="dt"
+                textKey={`home.hero.${stat}.value`}
+                value={t(texts, `home.hero.${stat}.value`)}
+                className="block font-display text-display-md font-medium text-ink"
+              />
+              <EditableText
+                as="dd"
+                textKey={`home.hero.${stat}.label`}
+                value={t(texts, `home.hero.${stat}.label`)}
+                className="mt-1 block text-sm text-ink-soft"
+              />
             </div>
           ))}
         </dl>

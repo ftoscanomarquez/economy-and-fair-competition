@@ -70,16 +70,27 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
               <dl className="mt-4 flex flex-col gap-4">
                 <div className="relative pl-7">
                   <MapPin className="absolute left-0 top-0.5 h-4 w-4 shrink-0 text-accent-deep" aria-hidden="true" />
-                  <dt className="text-xs uppercase tracking-wide text-ink-faint">
-                    {t(texts, "contact.direct.addressLabel")}
-                  </dt>
-                  <dd className="text-sm text-ink-soft">{t(texts, "contact.direct.address")}</dd>
+                  <EditableText
+                    as="dt"
+                    textKey="contact.direct.addressLabel"
+                    value={t(texts, "contact.direct.addressLabel")}
+                    className="block text-xs uppercase tracking-wide text-ink-faint"
+                  />
+                  <EditableText
+                    as="dd"
+                    textKey="contact.direct.address"
+                    value={t(texts, "contact.direct.address")}
+                    className="block text-sm text-ink-soft"
+                  />
                 </div>
                 <div className="relative pl-7">
                   <Mail className="absolute left-0 top-0.5 h-4 w-4 shrink-0 text-accent-deep" aria-hidden="true" />
-                  <dt className="text-xs uppercase tracking-wide text-ink-faint">
-                    {t(texts, "contact.direct.emailLabel")}
-                  </dt>
+                  <EditableText
+                    as="dt"
+                    textKey="contact.direct.emailLabel"
+                    value={t(texts, "contact.direct.emailLabel")}
+                    className="block text-xs uppercase tracking-wide text-ink-faint"
+                  />
                   <dd>
                     <a
                       href={`mailto:${t(texts, "contact.direct.email")}`}
@@ -91,10 +102,18 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
                 </div>
                 <div className="relative pl-7">
                   <Clock className="absolute left-0 top-0.5 h-4 w-4 shrink-0 text-accent-deep" aria-hidden="true" />
-                  <dt className="text-xs uppercase tracking-wide text-ink-faint">
-                    {t(texts, "contact.direct.hoursLabel")}
-                  </dt>
-                  <dd className="text-sm text-ink-soft">{t(texts, "contact.direct.hours")}</dd>
+                  <EditableText
+                    as="dt"
+                    textKey="contact.direct.hoursLabel"
+                    value={t(texts, "contact.direct.hoursLabel")}
+                    className="block text-xs uppercase tracking-wide text-ink-faint"
+                  />
+                  <EditableText
+                    as="dd"
+                    textKey="contact.direct.hours"
+                    value={t(texts, "contact.direct.hours")}
+                    className="block text-sm text-ink-soft"
+                  />
                 </div>
               </dl>
             </div>
