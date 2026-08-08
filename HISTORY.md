@@ -8,8 +8,8 @@
 
 ## Estado actual
 
-**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El repo está en GitHub (`ftoscanomarquez/economy-and-fair-competition`) con CI/CD funcionando de punta a punta (`ci.yml` automático, `load-test.yml` manual), y el sitio está en producción real en el dominio propio `https://economyandfaircompetition.com` (Vercel), con imágenes servidas desde Vercel Blob. Pendiente: configurar Resend (correo real de producción, hoy sin `RESEND_API_KEY`).
-**Última actualización:** 2026-08-07
+**Fase en curso:** Ninguna — **las 11 fases planificadas en `AGENTS.md` están cerradas**. El sitio está en producción real y completamente operativo en `https://economyandfaircompetition.com` (Vercel): CI/CD (`ci.yml`/`load-test.yml`), imágenes en Vercel Blob, y correo real vía Resend (dominio verificado, probado de punta a punta con un envío real confirmado por el usuario). `ADMIN_ALLOWED_EMAILS` de producción tiene los 2 correos admin reales. Sin pendientes de infraestructura conocidos.
+**Última actualización:** 2026-08-08
 
 ---
 
@@ -703,6 +703,28 @@ Tras conectar el dominio propio, el usuario reportó que las imágenes no cargab
 **Validado**: tras el deploy con estos cambios, verificación real con Playwright (`page.on("response")` filtrando por `blob.vercel-storage.com`/`/_next/image`) — cero requests fallidos, captura de pantalla confirma la imagen del hero y el resto del contenido cargando correctamente en `https://economyandfaircompetition.com/es`.
 
 **Confirmado con el usuario**: cualquier imagen que se suba desde el admin en producción (items de contenido, hero, bloques de posts, generación con IA) ahora se sube automáticamente a Vercel Blob sin cambio alguno en el flujo de la interfaz — el mismo endpoint `/api/uploads`, la bifurcación es interna a `lib/uploads.ts`.
+
+## 2026-08-08 — Correo real de producción configurado (Resend)
+
+**Contexto de la cuenta de Resend**: el usuario ya tenía una cuenta de Resend en uso para otro proyecto (`planet-scape`). El plan gratuito de Resend limita a **1 dominio verificado por cuenta**, no por volumen de correos como se asumía inicialmente — al intentar agregar `economyandfaircompetition.com` a esa cuenta existente, Resend exigió upgrade al plan Pro (de pago). Con el volumen de `planet-scape` confirmado como bajo, se optó por crear una **segunda cuenta de Resend gratuita**, exclusiva para este proyecto, en vez de pagar el plan Pro o migrar de proveedor.
+
+**Verificación del dominio** (cuenta nueva de Resend → Domains → Add Domain → `economyandfaircompetition.com`), 3 registros DNS agregados en WordPress.com (mismo panel usado para conectar el dominio a Vercel):
+- `TXT resend._domainkey` → clave pública DKIM.
+- `MX send` → `feedback-smtp.us-east-1.amazonses.com`, prioridad 10.
+- `TXT send` → `v=spf1 include:amazonses.com ~all`.
+
+Los tres usan el subdominio `send.economyandfaircompetition.com` o un nombre específico (`resend._domainkey`) — **no chocan** con el SPF/DKIM ya existentes de WordPress en el dominio raíz (`@`), verificado antes de guiar al usuario a agregarlos (no fue necesario fusionar registros, a diferencia de lo anticipado). Propagación confirmada con `nslookup` en minutos; Resend verificó el dominio de inmediato tras eso.
+
+**Configuración final en Vercel** (`vercel env add ... production` + redeploy):
+- `RESEND_API_KEY`: la key real generada en la cuenta nueva de Resend (`economy-and-fair-competition-prod`).
+- `MAIL_FROM`: sin cambios (`no-reply@economyandfaircompetition.com`, ya configurado en el primer deploy) — confirmado que el dominio raíz completo queda autorizado para enviar una vez verificado el DKIM, no solo el subdominio `send.`.
+- `CONTACT_NOTIFICATION_EMAIL`: corregido de `contacto@economyandfaircompetition.com` (placeholder usado solo para no bloquear el deploy inicial, nunca fue el correo real) a `economyandfaircompetition@gmail.com` — el correo real de la firma para recibir consultas del formulario de contacto, confirmado explícitamente por el usuario en esta sesión.
+- `ADMIN_ALLOWED_EMAILS`: de un solo correo placeholder (`admin@economyandfaircompetition.com`) a los dos correos admin productivos reales: `francisco.alberto.tm@gmail.com` y `economyandfaircompetition@gmail.com` (separados por coma, formato que ya espera `lib/env.ts`).
+- `.env` local: `CONTACT_NOTIFICATION_EMAIL` actualizado a `francisco.alberto.tm@gmail.com` (correo real del usuario, para que las pruebas locales del formulario de contacto —vía Mailpit— también reflejen el destinatario real). `ADMIN_ALLOWED_EMAILS` local se dejó intacto (`admin@economyandfaircompetition.com`) — es el correo hardcodeado en `tests/e2e/helpers/auth.ts` para el login automático de Playwright; cambiarlo ahí habría requerido actualizar también la suite de pruebas, fuera de alcance de este cambio.
+
+**Validado de punta a punta con una prueba real** (no simulada): `CONTACT_NOTIFICATION_EMAIL` se cambió temporalmente a `francisco.alberto.tm@gmail.com`, se hizo un redeploy, y se disparó un `POST /api/contact` real contra `https://economyandfaircompetition.com` vía `curl`. Log de Vercel (`vercel logs`) confirmó la cadena completa: conexión a Mongo → circuit breaker de Resend pasa de `HALF_OPEN` a `CLOSED` tras la llamada exitosa → `"Correo enviado vía Resend"` con el `id` real de Resend → `emailDelivered: true`. El usuario confirmó la recepción real en su bandeja. Tras la confirmación, se restauró `CONTACT_NOTIFICATION_EMAIL` al valor real de producción y se hizo el redeploy final con `ADMIN_ALLOWED_EMAILS` ya con ambos correos admin.
+
+**Pendiente inmediato, ya sin bloqueantes de infraestructura**: el usuario probará a continuación el flujo de login por magic link en producción real, con ambos correos admin ya autorizados.
 
 ## Cómo retomar si se interrumpe el trabajo
 
