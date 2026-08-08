@@ -247,6 +247,10 @@ curl http://localhost:3001/.well-known/mcp/server-cards.json
 2. El correo de notificación llega a Mailpit (dev) o a `CONTACT_NOTIFICATION_EMAIL` vía Resend (prod).
 3. Registro auditado en la colección `contact_submissions`.
 
+**Dirección, correo directo y mapa de esa misma página** (columna derecha, "Datos Directos de Atención") vienen de `site_texts` (claves `contact.direct.address`, `contact.direct.email`, `contact.direct.hours`) — editables en vivo desde el admin como cualquier otro `EditableText`, o cambiando el seed en `content/seeds/site-texts.ts` y corriendo `npm run seed:config`.
+
+**Mapa real de Google Maps** (`components/marketing/map-embed.tsx`, reemplazó un SVG decorativo que nunca fue un mapa real): es un `<iframe>` apuntando a `https://www.google.com/maps?q=<dirección-codificada>&output=embed` — **no requiere API key ni cuenta de Google Cloud**, es el mismo formato que genera el botón "Compartir → Insertar un mapa" de Google Maps. Usa como `address` el mismo texto de `contact.direct.address`, así que basta con editar esa clave (admin o seed) para que el mapa apunte a la dirección correcta automáticamente — no hay que tocar coordenadas ni el componente.
+
 ## Testing
 
 ### Vitest (unitarias — esquemas Zod, rate limit, IA)

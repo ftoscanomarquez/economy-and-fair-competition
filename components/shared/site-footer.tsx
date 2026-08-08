@@ -34,8 +34,8 @@ export function SiteFooter() {
             <p className="font-mono text-eyebrow uppercase tracking-[0.14em] text-bg/40">Contacto</p>
             <ul className="mt-4 flex flex-col gap-3 text-sm text-bg/70">
               <li>
-                <a href="mailto:contacto@economyandfaircompetition.com" className="hover:text-bg">
-                  contacto@economyandfaircompetition.com
+                <a href="mailto:economyandfaircompetition@gmail.com" className="hover:text-bg">
+                  economyandfaircompetition@gmail.com
                 </a>
               </li>
             </ul>

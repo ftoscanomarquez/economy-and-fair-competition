@@ -1,13 +1,13 @@
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
-import { Mail, Clock } from "lucide-react";
+import { Mail, Clock, MapPin } from "lucide-react";
 import { getSiteTexts } from "@/lib/content";
 import { t } from "@/lib/content-client";
 import { isLocale, defaultLocale, type Locale } from "@/lib/i18n";
 import { SectionEyebrow } from "@/components/marketing/section-eyebrow";
 import { EditableText } from "@/components/admin/editable-text";
 import { ContactForm } from "@/components/marketing/contact-form";
-import { StyledMap } from "@/components/marketing/styled-map";
+import { MapEmbed } from "@/components/marketing/map-embed";
 
 export async function generateMetadata({
   params,
@@ -69,6 +69,13 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
               />
               <dl className="mt-4 flex flex-col gap-4">
                 <div className="relative pl-7">
+                  <MapPin className="absolute left-0 top-0.5 h-4 w-4 shrink-0 text-accent-deep" aria-hidden="true" />
+                  <dt className="text-xs uppercase tracking-wide text-ink-faint">
+                    {t(texts, "contact.direct.addressLabel")}
+                  </dt>
+                  <dd className="text-sm text-ink-soft">{t(texts, "contact.direct.address")}</dd>
+                </div>
+                <div className="relative pl-7">
                   <Mail className="absolute left-0 top-0.5 h-4 w-4 shrink-0 text-accent-deep" aria-hidden="true" />
                   <dt className="text-xs uppercase tracking-wide text-ink-faint">
                     {t(texts, "contact.direct.emailLabel")}
@@ -99,7 +106,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
                 value={t(texts, "contact.map.title")}
                 className="mb-4 block font-display text-lg font-medium text-ink"
               />
-              <StyledMap label={t(texts, "contact.map.title")} />
+              <MapEmbed address={t(texts, "contact.direct.address")} label={t(texts, "contact.map.title")} />
             </div>
           </div>
         </div>

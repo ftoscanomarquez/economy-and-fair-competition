@@ -694,8 +694,18 @@ export const siteTextSeeds: SiteTextSeed[] = [
     en: "We could not send your message. Please try again or contact us directly by email.",
   },
   { key: "contact.direct.title", es: "Datos Directos de Atención", en: "Direct Contact Details" },
-  { key: "contact.direct.emailLabel", es: "Correo", en: "Email" },
-  { key: "contact.direct.email", es: "contacto@economyandfaircompetition.com", en: "contacto@economyandfaircompetition.com" },
+  { key: "contact.direct.addressLabel", es: "Dirección", en: "Address" },
+  {
+    key: "contact.direct.address",
+    es: "Bosque de Cipreses Sur 51, Bosques de las Lomas, Miguel Hidalgo, CDMX, 11700",
+    en: "Bosque de Cipreses Sur 51, Bosques de las Lomas, Miguel Hidalgo, CDMX, 11700",
+  },
+  { key: "contact.direct.emailLabel", es: "Correo Electrónico", en: "Email" },
+  {
+    key: "contact.direct.email",
+    es: "economyandfaircompetition@gmail.com",
+    en: "economyandfaircompetition@gmail.com",
+  },
   { key: "contact.direct.hoursLabel", es: "Horario de atención", en: "Business hours" },
   {
     key: "contact.direct.hours",
