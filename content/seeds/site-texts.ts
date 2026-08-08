@@ -713,4 +713,12 @@ export const siteTextSeeds: SiteTextSeed[] = [
     en: "Monday to Friday, 9:00 AM to 6:00 PM (Mexico City time)",
   },
   { key: "contact.map.title", es: "Ubicación", en: "Location" },
+
+  { key: "footer.brand", es: "Economy & Fair Competition", en: "Economy & Fair Competition" },
+  {
+    key: "footer.tagline",
+    es: "Comercio Exterior, Derecho Aduanero y Propiedad Intelectual e Industrial. Más de 28 años de experiencia e infraestructura global.",
+    en: "Foreign Trade, Customs Law, and Intellectual and Industrial Property. Over 28 years of experience and global infrastructure.",
+  },
+  { key: "footer.contactLabel", es: "Contacto", en: "Contact" },
 ];

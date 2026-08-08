@@ -19,7 +19,7 @@ export default async function MarketingLayout({
     <>
       <SiteHeader locale={locale} />
       <main id="main-content">{children}</main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 
