@@ -73,7 +73,15 @@ npm run build           # build de producción
 npm run start           # servir build de producción
 ```
 
-## Base de datos (seeds obligatorias — orden estricto)
+## Base de datos
+
+**Dev y producción usan bases de Mongo separadas** desde 2026-08-08 (ver `INFRA.md` § "Bases de datos separadas dev/producción" para el porqué) — el `.env` local apunta a un Mongo en Docker (`mongodb://<usuario>:<password>@localhost:<puerto>/?authSource=admin`, base `economy-and-fair-competition-dev`), nunca directo a Atlas. Si el contenedor no está corriendo:
+
+```bash
+docker start <nombre-del-contenedor>   # o `docker ps -a` para encontrarlo si no se recuerda el nombre
+```
+
+### Seeds (orden estricto)
 
 ```bash
 npm run seed:schema     # 1. crea/actualiza colecciones con validación JSON Schema (incluye templates, ai_config)
@@ -83,6 +91,8 @@ npm run seed:all        # ejecuta las tres en orden
 ```
 
 `seed:schema` es idempotente y también migra el *validator* de colecciones ya existentes (`collMod`) cuando el esquema cambia — correrlo de nuevo tras un `git pull` que toque `lib/blocks/schema.ts` o `lib/posts-taxonomy.ts` es seguro y recomendado.
+
+Estos seeds cargan datos de ejemplo (`content/seeds/`), no un snapshot de producción. Para clonar datos reales de Atlas a la base local (por ejemplo, tras un cambio de contenido real en producción que se quiera reflejar en dev), escribir un script puntual con el driver de Mongo que lea de Atlas (usando la `MONGODB_URI` real, ver `.env.prod`) y escriba en la base local — **nunca** al revés, y confirmar explícitamente antes de correrlo dado que toca el cluster de producción (aunque sea solo lectura).
 
 ---
 
