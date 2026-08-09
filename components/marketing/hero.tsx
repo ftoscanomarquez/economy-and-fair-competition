@@ -8,7 +8,7 @@ import { t } from "@/lib/content";
 export function Hero({ texts }: { texts: Record<string, string> }) {
   return (
     <section className="relative overflow-hidden border-b border-border">
-      <div className="absolute -right-16 top-1/2 hidden h-[520px] w-[640px] -translate-y-1/2 overflow-hidden rounded-lg shadow-raised lg:block">
+      <div className="absolute -right-16 top-24 hidden h-[520px] w-[640px] overflow-hidden rounded-lg shadow-raised lg:top-32 lg:block">
         <EditableImage
           textKey="home.hero.image"
           value={t(texts, "home.hero.image")}
